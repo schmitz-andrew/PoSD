@@ -136,11 +136,6 @@ class MainActivity : ComponentActivity() {
                 recognizer.process(bitmap, 0)
                     .addOnSuccessListener {
                         text -> showOcrData(text)
-//                        text -> run {
-//                            Log.d(TAG, text.text)
-//                            // TODO filter out expiry date
-//                            expDate = text.text
-//                        }
                     }
                     .addOnCanceledListener {
                         Log.e(TAG, "ocr cancelled!")
@@ -255,7 +250,7 @@ fun Greeting(activity: MainActivity, modifier: Modifier = Modifier) {
         }
         Text(prodInfo)
         if (prodImgUrl.isNotBlank()) {
-            AsyncImage(model = prodImgUrl, contentDescription = "Image of product", modifier = Modifier.fillMaxSize())
+            AsyncImage(model = prodImgUrl, contentDescription = "Image of product"/*, modifier = Modifier.fillMaxSize()*/)
         }
         Text(ocrData)
     }
