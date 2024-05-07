@@ -13,17 +13,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import coil.compose.AsyncImage
 import com.example.barcode.ui.theme.BarCodeTheme
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetException
 import org.chromium.net.UrlRequest
 import org.chromium.net.UrlResponseInfo
+import org.json.JSONException
 import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
@@ -34,10 +39,13 @@ val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS
 var code: String? = null
 var expDate: String? = null
 
-class MyUrlRequestCallback: UrlRequest.Callback() {
+const val TAG = "TEST_CODE"
+
+class MyUrlRequestCallback(private val successCb: (JSONObject) -> (Unit), private val errorCb: (Exception) -> (Unit)) : UrlRequest.Callback() {
 
     private var reqString = ""
-    public var json: JSONObject? = null
+    private var charset = "UTF-8"
+    private var json: JSONObject? = null
 
     override fun onRedirectReceived(
         request: UrlRequest?,
@@ -49,7 +57,27 @@ class MyUrlRequestCallback: UrlRequest.Callback() {
 
     override fun onResponseStarted(request: UrlRequest?, info: UrlResponseInfo?) {
         // deal with headers and status code TODO
-        request?.read(ByteBuffer.allocateDirect(102400))
+        if (info?.httpStatusCode == 200) {
+            Log.i(TAG, info.allHeaders.keys.toString())
+            Log.i(TAG, info.receivedByteCount.toString())
+            val contentLength = info.allHeaders["Content-Length"]//info.allHeaders["access-control-expose-headers"]?.get(0)
+            Log.i(TAG, contentLength.toString())
+            // FIXME probs not the way to get charset
+            val recCharset = info.allHeaders["charset"]?.get(0)
+            Log.i(TAG, info.allHeaders["content-length"].toString())
+            Log.i(TAG, recCharset.toString())
+            if (!recCharset.isNullOrBlank()) {
+                charset = recCharset
+            }
+
+            // TODO use content length if possible
+            val capacity = 1024000
+            request?.read(ByteBuffer.allocateDirect(capacity))
+        }
+        else {
+            Log.i(TAG, info?.httpStatusCode.toString())
+            // TODO deal with 4/5 00 codes
+        }
     }
 
     override fun onReadCompleted(
@@ -57,26 +85,39 @@ class MyUrlRequestCallback: UrlRequest.Callback() {
         info: UrlResponseInfo?,
         byteBuffer: ByteBuffer?
     ) {
-        reqString = reqString.plus(byteBuffer?.array()?.toString(Charset.forName("utf-8")))
-        Log.d("henlo", reqString)
+        val str = byteBuffer?.array()?.toString(Charset.forName("UTF-8"))
+        if (str == null) {
+            Log.d(TAG, "empty or failed read")
+        }
+        reqString = reqString.plus(str)
         byteBuffer?.clear()
         request?.read(byteBuffer)
     }
 
     override fun onSucceeded(request: UrlRequest?, info: UrlResponseInfo?) {
-        Log.i("henlo", request.toString())
-        Log.i("henlo", info.toString())
-        json = JSONObject("{".plus(reqString.substringAfter('{')))
-        //TODO("Not yet implemented onSucceeded")
+        Log.i(TAG, request.toString())
+        Log.i(TAG, info.toString())
+        try {
+            json = JSONObject("{".plus(reqString.substringAfter('{').substringBeforeLast('}')).plus('}'))
+            successCb(json!!)
+        }
+        catch (e: JSONException) {
+            Log.e(TAG, e.toString())
+            errorCb(e)
+        }
     }
 
     override fun onFailed(request: UrlRequest?, info: UrlResponseInfo?, error: CronetException?) {
-        Log.e("henlo", error.toString())
-        //TODO("Not yet implemented onFailed")
+        if (error != null) {
+            errorCb(error)
+        }
+        else {
+            Log.e(TAG, "DB access failed w/o exception")
+        }
     }
 
     override fun onCanceled(request: UrlRequest?, info: UrlResponseInfo?) {
-        Log.e("henlo", "request cancelled")
+        Log.e(TAG, "request cancelled")
         reqString = ""
     }
 }
@@ -84,35 +125,36 @@ class MyUrlRequestCallback: UrlRequest.Callback() {
 
 class MainActivity : ComponentActivity() {
 
-    public val getPictureResult = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) {
+    val getPictureResult = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) {
         bitmap -> run {
-            Log.d("henlo", bitmap.toString())
+            Log.d(TAG, bitmap.toString())
             if (bitmap == null) {
-                Log.e("henlo", "no bitmap returned")
+                Log.e(TAG, "no bitmap returned")
             }
             else {
-                // TODO consider rotation
+                // TODO consider rotation, check aspect ratio
                 recognizer.process(bitmap, 0)
                     .addOnSuccessListener {
-                        text -> run {
-                            Log.d("henlo", text.text)
-                            // TODO filter out expiry date
-                            expDate = text.text
-                        }
+                        text -> showOcrData(text)
+//                        text -> run {
+//                            Log.d(TAG, text.text)
+//                            // TODO filter out expiry date
+//                            expDate = text.text
+//                        }
                     }
                     .addOnCanceledListener {
-                        Log.e("henlo", "ocr cancelled!")
+                        Log.e(TAG, "ocr cancelled!")
                     }
                     .addOnFailureListener {
-                        err -> run {Log.e("henlo", err.toString())}
+                        err -> run {Log.e(TAG, err.toString())}
                     }
             }
         }
     }
 
-    public lateinit var scanner: GmsBarcodeScanner
+    lateinit var scanner: GmsBarcodeScanner
 
-    public lateinit var cronet: CronetEngine
+    lateinit var cronet: CronetEngine
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -132,8 +174,44 @@ class MainActivity : ComponentActivity() {
 
 }
 
+val txtProdInfo = mutableStateOf("No barcode scanned")
+val imgProdUrl = mutableStateOf("")
+val txtOcrData = mutableStateOf("no ocr done")
+
+fun showProductInfo(prodJson: JSONObject) {
+    val prodString = prodJson.toString(2)
+    val prodCode = prodJson.get("code")
+    val prodObj = prodJson.getJSONObject("product")
+    val prodName = prodObj.get("product_name")
+    val prodImg = prodObj.get("image_small_url")
+
+    Log.i(TAG, prodString)
+    txtProdInfo.value = "Code: $prodCode\nProduct name: $prodName"
+
+    // TODO product/image_small_url
+    if (prodImg.toString().isNotBlank()) {
+        imgProdUrl.value = prodImg.toString()
+    }
+}
+
+fun showError(e: Exception) {
+    Log.e(TAG, e.toString())
+    txtProdInfo.value = "ERROR: ${e.message}"
+}
+
+fun showOcrData(text: Text) {
+    Log.d(TAG, text.text)
+    // TODO filter out expiry date
+    expDate = text.text
+    txtOcrData.value = text.text
+}
+
 @Composable
 fun Greeting(activity: MainActivity, modifier: Modifier = Modifier) {
+    val prodInfo by txtProdInfo
+    val prodImgUrl by imgProdUrl
+    val ocrData by txtOcrData
+
     Column (modifier) {
         Button(
             onClick = {
@@ -141,7 +219,7 @@ fun Greeting(activity: MainActivity, modifier: Modifier = Modifier) {
                     activity.getPictureResult.launch(null)
                 } catch (e: ActivityNotFoundException) {
                     // display error state to the user
-                    Log.e("henlo", e.toString())
+                    Log.e(TAG, e.toString())
                 }
             }
         ) {
@@ -153,31 +231,33 @@ fun Greeting(activity: MainActivity, modifier: Modifier = Modifier) {
                     .addOnSuccessListener { barcode -> run {
                         code = barcode.rawValue
                         if (code == null) {
-                            Log.e("henlo", "code is empty")
+                            Log.e(TAG, "code is empty")
                         }
                         else {
-                            Log.i("henlo", code.orEmpty())
-                            val db_url = "https://world.openfoodfacts.org/api/v2/product/${code.orEmpty()}.json"
-                            val cb = MyUrlRequestCallback()
+                            txtProdInfo.value = "Waiting for product information..."
+                            Log.i(TAG, code.orEmpty())
+                            val dbUrl = "https://world.openfoodfacts.org/api/v2/product/${code.orEmpty()}.json"
+                            val cb = MyUrlRequestCallback(::showProductInfo, ::showError)
                             val builder = activity.cronet.newUrlRequestBuilder(
-                                db_url,
+                                dbUrl,
                                 cb,
                                 Executors.newSingleThreadExecutor()
                             )
                             val request = builder.build()
                             request.start()
-                            while (!request.isDone || cb.json == null) {
-                                Log.d("henlo", "in progress")
-                            }
-                            Log.i("henlo", cb.json!!.toString(2))
                         }
                     }}
-                    .addOnCanceledListener { Log.e("henlo", "cancelled!") }
-                    .addOnFailureListener { err -> Log.e("henlo", err.toString()) }
+                    .addOnCanceledListener { Log.e(TAG, "cancelled!") }
+                    .addOnFailureListener { err -> Log.e(TAG, err.toString()) }
             }
         ) {
             Text("Scan barcode")
         }
+        Text(prodInfo)
+        if (prodImgUrl.isNotBlank()) {
+            AsyncImage(model = prodImgUrl, contentDescription = "Image of product", modifier = Modifier.fillMaxSize())
+        }
+        Text(ocrData)
     }
 }
 

@@ -48,6 +48,8 @@ android {
 
 dependencies {
 
+    implementation(libs.coil.compose)
+
     implementation(libs.play.services.cronet)
     implementation(libs.play.services.code.scanner)
     implementation (libs.play.services.mlkit.text.recognition)
