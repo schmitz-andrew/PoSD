@@ -33,21 +33,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.android.volley.Request
+import com.android.volley.RequestQueue
+import com.android.volley.Response
+import com.android.volley.toolbox.JsonObjectRequest
+import com.android.volley.toolbox.Volley
 import com.example.barcode.ui.theme.BarCodeTheme
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import org.chromium.net.CronetEngine
-import org.chromium.net.CronetException
-import org.chromium.net.UrlRequest
-import org.chromium.net.UrlResponseInfo
-import org.json.JSONException
 import org.json.JSONObject
-import java.nio.ByteBuffer
-import java.nio.charset.Charset
-import java.util.concurrent.Executors
 
 
 val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
@@ -56,89 +53,6 @@ var expDate: String? = null
 
 const val TAG = "TEST_CODE"
 
-class MyUrlRequestCallback(
-    private val successCb: (JSONObject) -> (Unit),
-    private val errorCb: (Exception) -> (Unit)
-) : UrlRequest.Callback() {
-
-    private var reqString = ""
-    private var charset = "UTF-8"
-    private var json: JSONObject? = null
-
-    override fun onRedirectReceived(
-        request: UrlRequest?,
-        info: UrlResponseInfo?,
-        newLocationUrl: String?
-    ) {
-        request?.followRedirect()
-    }
-
-    override fun onResponseStarted(request: UrlRequest?, info: UrlResponseInfo?) {
-        // deal with headers and status code TODO
-        if (info?.httpStatusCode == 200) {
-            Log.i(TAG, info.allHeaders.keys.toString())
-            Log.i(TAG, info.receivedByteCount.toString())
-            val contentLength =
-                info.allHeaders["Content-Length"]//info.allHeaders["access-control-expose-headers"]?.get(0)
-            Log.i(TAG, contentLength.toString())
-            // FIXME probs not the way to get charset
-            val recCharset = info.allHeaders["charset"]?.get(0)
-            Log.i(TAG, info.allHeaders["content-length"].toString())
-            Log.i(TAG, recCharset.toString())
-            if (!recCharset.isNullOrBlank()) {
-                charset = recCharset
-            }
-
-            // TODO use content length if possible
-            val capacity = 1024000
-            request?.read(ByteBuffer.allocateDirect(capacity))
-        } else {
-            Log.i(TAG, info?.httpStatusCode.toString())
-            // TODO deal with 4/5 00 codes
-        }
-    }
-
-    override fun onReadCompleted(
-        request: UrlRequest?,
-        info: UrlResponseInfo?,
-        byteBuffer: ByteBuffer?
-    ) {
-        val str = byteBuffer?.array()?.toString(Charset.forName("UTF-8"))
-        if (str == null) {
-            Log.d(TAG, "empty or failed read")
-        }
-        reqString = reqString.plus(str)
-        byteBuffer?.clear()
-        request?.read(byteBuffer)
-    }
-
-    override fun onSucceeded(request: UrlRequest?, info: UrlResponseInfo?) {
-        Log.i(TAG, request.toString())
-        Log.i(TAG, info.toString())
-        try {
-            json = JSONObject(
-                "{".plus(reqString.substringAfter('{').substringBeforeLast('}')).plus('}')
-            )
-            successCb(json!!)
-        } catch (e: JSONException) {
-            Log.e(TAG, e.toString())
-            errorCb(e)
-        }
-    }
-
-    override fun onFailed(request: UrlRequest?, info: UrlResponseInfo?, error: CronetException?) {
-        if (error != null) {
-            errorCb(error)
-        } else {
-            Log.e(TAG, "DB access failed w/o exception")
-        }
-    }
-
-    override fun onCanceled(request: UrlRequest?, info: UrlResponseInfo?) {
-        Log.e(TAG, "request cancelled")
-        reqString = ""
-    }
-}
 
 data class Product(val name: String, val quantity: Int, val expireDate: String)
 
@@ -173,13 +87,13 @@ class MainActivity : ComponentActivity() {
 
     lateinit var scanner: GmsBarcodeScanner
 
-    lateinit var cronet: CronetEngine
+    lateinit var requestQueue: RequestQueue
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         scanner = GmsBarcodeScanning.getClient(this)
-        cronet = CronetEngine.Builder(this).build()
+        requestQueue = Volley.newRequestQueue(this)
 
         setContent {
             BarCodeTheme {
@@ -209,7 +123,6 @@ fun showProductInfo(prodJson: JSONObject) {
     Log.i(TAG, prodString)
     txtProdInfo.value = "Code: $prodCode\nProduct name: $prodName"
 
-    // TODO product/image_small_url
     if (prodImg.toString().isNotBlank()) {
         imgProdUrl.value = prodImg.toString()
     }
@@ -313,14 +226,12 @@ fun Greeting(activity: MainActivity, modifier: Modifier = Modifier, items: List<
                                     Log.i(TAG, code.orEmpty())
                                     val dbUrl =
                                         "https://world.openfoodfacts.org/api/v2/product/${code.orEmpty()}.json"
-                                    val cb = MyUrlRequestCallback(::showProductInfo, ::showError)
-                                    val builder = activity.cronet.newUrlRequestBuilder(
-                                        dbUrl,
-                                        cb,
-                                        Executors.newSingleThreadExecutor()
+                                    val request = JsonObjectRequest(
+                                        Request.Method.GET, dbUrl, null,
+                                        Response.Listener(::showProductInfo),
+                                        Response.ErrorListener(::showError)
                                     )
-                                    val request = builder.build()
-                                    request.start()
+                                    activity.requestQueue.add(request)
                                 }
                             }
                         }
