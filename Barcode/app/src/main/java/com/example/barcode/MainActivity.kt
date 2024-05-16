@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
@@ -58,17 +59,19 @@ var expDate: String? = null
 const val TAG = "TEST_CODE"
 
 
-data class Product(val name: String, val quantity: Int, val expireDate: String)
+data class Product(
+    val name: String,
+    val quantity: Int,
+    val expireDate: String,
+    var inCart: Boolean = false
+)
 
-private val productsAtHome = listOf(
+private val productsAtHome = mutableListOf<Product>(
     Product("Product A", 2, "2024-05-30"),
     Product("Product B", 5, "2024-06-15")
 )
 
-private val productsInCart = listOf(
-    Product("Product C", 1, ""),
-    Product("Product B", 3, "")
-)
+private val productsInCart = mutableListOf<Product>()
 
 class MainActivity : ComponentActivity() {
 
@@ -111,7 +114,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainScreen(this, items = productsAtHome)
+                    MainScreen(this)
                 }
             }
         }
@@ -150,7 +153,7 @@ fun showOcrData(text: Text) {
 }
 
 @Composable
-fun ProductItem(product: Product) {
+fun ProductItem(product: Product, onRemoveClick: (Product) -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -165,11 +168,20 @@ fun ProductItem(product: Product) {
             Text(text = "Expires: ${product.expireDate}")
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            IconButton(onClick = { onDeleteClick(product) }) {
-                Icon(imageVector = Icons.Filled.Close, contentDescription = "Delete")
+            if (!product.inCart) {
+                IconButton(onClick = { onAddToCartClick(product) }) {
+                    Icon(
+                        imageVector = Icons.Filled.ShoppingCart,
+                        contentDescription = "Add to Cart"
+                    )
+                }
+            } else {
+                IconButton(onClick = { onMoveToHomeClick(product.copy()) }) { // Create a copy to avoid mutating original list
+                    Icon(imageVector = Icons.Filled.Home, contentDescription = "Move to Home List")
+                }
             }
-            IconButton(onClick = { onAddToCartClick(product) }) {
-                Icon(imageVector = Icons.Filled.ShoppingCart, contentDescription = "Add to Cart")
+            IconButton(onClick = { onRemoveClick(product) }) {
+                Icon(imageVector = Icons.Filled.Close, contentDescription = "Delete")
             }
         }
     }
@@ -187,7 +199,23 @@ fun onDeleteClick(product: Product) {
 }
 
 fun onAddToCartClick(product: Product) {
-    // Add the product to the cart (handle cart logic)
+    val index = productsAtHome.indexOf(product)
+    if (index != -1) {
+        val newProduct = productsAtHome[index]
+        newProduct.inCart = true
+        productsInCart.add(newProduct)
+        productsAtHome.removeAt(index)
+    }
+}
+
+fun onMoveToHomeClick(product: Product) {
+    val index = productsInCart.indexOf(product)
+    if (index != -1) {
+        val newProduct = productsInCart[index]
+        product.inCart = false
+        productsAtHome.add(newProduct)
+        productsInCart.removeAt(index)
+    }
 }
 
 @Composable
@@ -205,7 +233,7 @@ fun CartButton(onClick: () -> Unit) {
 }
 
 @Composable
-fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier, items: List<Product>) {
+fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
     val prodInfo by txtProdInfo
     val prodImgUrl by imgProdUrl
     val ocrData by txtOcrData
@@ -268,35 +296,51 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier, items: Lis
         val onListChange = { newIndex: Int -> currentListIndex = newIndex }
 
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 HomeButton { onListChange(0) }
                 CartButton { onListChange(1) }
             }
 
             when (currentListIndex) {
                 0 -> LazyColumn(modifier = Modifier.weight(1f)) {
-                    if (items.isEmpty()) {
+                    if (productsAtHome.isEmpty()) {
                         item {
-                            Text(text = "Your list is empty.", modifier = Modifier.fillMaxSize())
+                            Text(
+                                text = "You don't have any food at home.",
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     } else {
-                        items(items = productsAtHome) { product ->
-                            ProductItem(product = product)
+                        items(productsAtHome.size) { index ->
+                            val product = productsAtHome[index]
+                            ProductItem(product) { removedProduct ->
+                                productsAtHome.remove(removedProduct)
+                            }
                         }
                     }
                 }
+
                 1 -> LazyColumn(modifier = Modifier.weight(1f)) {
-                    if (items.isEmpty()) {
+                    if (productsInCart.isEmpty()) {
                         item {
-                            Text(text = "Your list is empty.", modifier = Modifier.fillMaxSize())
+                            Text(
+                                text = "Your shopping list is empty.",
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     } else {
-                        items(items = productsInCart) { product ->
-                            ProductItem(product = product)
+                        items(productsInCart.size) { index ->
+                            val product = productsInCart[index]
+                            ProductItem(product) { removedProduct ->
+                                productsInCart.remove(removedProduct)
+
+                            }
                         }
                     }
                 }
-                else -> {}  // Handle potential other list indices
             }
         }
 
@@ -315,6 +359,6 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier, items: Lis
 @Composable
 fun MainScreenPreview() {
     BarCodeTheme {
-        MainScreen(MainActivity(), modifier = Modifier, productsAtHome)
+        MainScreen(MainActivity(), modifier = Modifier)
     }
 }
