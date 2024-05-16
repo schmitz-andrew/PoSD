@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,7 +29,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -56,9 +60,14 @@ const val TAG = "TEST_CODE"
 
 data class Product(val name: String, val quantity: Int, val expireDate: String)
 
-private val products = listOf(
+private val productsAtHome = listOf(
     Product("Product A", 2, "2024-05-30"),
     Product("Product B", 5, "2024-06-15")
+)
+
+private val productsInCart = listOf(
+    Product("Product C", 1, ""),
+    Product("Product B", 3, "")
 )
 
 class MainActivity : ComponentActivity() {
@@ -102,7 +111,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    Greeting(this, items = products)
+                    MainScreen(this, items = productsAtHome)
                 }
             }
         }
@@ -141,9 +150,7 @@ fun showOcrData(text: Text) {
 }
 
 @Composable
-fun ProductItem(
-    product: Product,
-) {
+fun ProductItem(product: Product) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -172,9 +179,9 @@ fun ProductItem(
 // Implement click handler functions
 fun onDeleteClick(product: Product) {
     // Remove the product from the list (update data)
-    val index = products.indexOf(product)
+    val index = productsAtHome.indexOf(product)
     if (index != -1) {
-        products.toMutableList().removeAt(index)
+        productsAtHome.toMutableList().removeAt(index)
         // Update UI to reflect product removal (call a function to refresh the list)
     }
 }
@@ -184,10 +191,25 @@ fun onAddToCartClick(product: Product) {
 }
 
 @Composable
-fun Greeting(activity: MainActivity, modifier: Modifier = Modifier, items: List<Product>) {
+fun HomeButton(onClick: () -> Unit) {
+    Button(onClick = onClick) {
+        Text("At Home")
+    }
+}
+
+@Composable
+fun CartButton(onClick: () -> Unit) {
+    Button(onClick = onClick) {
+        Text("In Cart")
+    }
+}
+
+@Composable
+fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier, items: List<Product>) {
     val prodInfo by txtProdInfo
     val prodImgUrl by imgProdUrl
     val ocrData by txtOcrData
+    var currentListIndex by remember { mutableIntStateOf(0) }  // Initial index is 0 (first list)
 
     Column(modifier) {
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -243,17 +265,41 @@ fun Greeting(activity: MainActivity, modifier: Modifier = Modifier, items: List<
                 Icon(imageVector = Icons.Filled.Star, contentDescription = "QR Code")
             }
         }
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            if (items.isEmpty()) {
-                item {
-                    Text(text = "Your list is empty.", modifier = Modifier.fillMaxSize())
+        val onListChange = { newIndex: Int -> currentListIndex = newIndex }
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                HomeButton { onListChange(0) }
+                CartButton { onListChange(1) }
+            }
+
+            when (currentListIndex) {
+                0 -> LazyColumn(modifier = Modifier.weight(1f)) {
+                    if (items.isEmpty()) {
+                        item {
+                            Text(text = "Your list is empty.", modifier = Modifier.fillMaxSize())
+                        }
+                    } else {
+                        items(items = productsAtHome) { product ->
+                            ProductItem(product = product)
+                        }
+                    }
                 }
-            } else {
-                items(items = products) { product ->
-                    ProductItem(product = product)
+                1 -> LazyColumn(modifier = Modifier.weight(1f)) {
+                    if (items.isEmpty()) {
+                        item {
+                            Text(text = "Your list is empty.", modifier = Modifier.fillMaxSize())
+                        }
+                    } else {
+                        items(items = productsInCart) { product ->
+                            ProductItem(product = product)
+                        }
+                    }
                 }
+                else -> {}  // Handle potential other list indices
             }
         }
+
         Text(prodInfo)
         if (prodImgUrl.isNotBlank()) {
             AsyncImage(
@@ -267,8 +313,8 @@ fun Greeting(activity: MainActivity, modifier: Modifier = Modifier, items: List<
 
 @Preview(showBackground = true)
 @Composable
-fun GreetingPreview() {
+fun MainScreenPreview() {
     BarCodeTheme {
-        Greeting(MainActivity(), modifier = Modifier, products)
+        MainScreen(MainActivity(), modifier = Modifier, productsAtHome)
     }
 }
