@@ -1,11 +1,13 @@
 package com.example.barcode
 
 import android.content.ActivityNotFoundException
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -23,11 +24,17 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -37,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.android.volley.Request
 import com.android.volley.RequestQueue
@@ -50,6 +58,12 @@ import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import org.json.JSONObject
+import java.lang.Integer.parseInt
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 
 val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
@@ -66,7 +80,7 @@ data class Product(
     var inCart: Boolean = false
 )
 
-private val productsAtHome = mutableListOf<Product>(
+private val productsAtHome = mutableListOf(
     Product("Product A", 2, "2024-05-30"),
     Product("Product B", 5, "2024-06-15")
 )
@@ -101,6 +115,7 @@ class MainActivity : ComponentActivity() {
 
     lateinit var requestQueue: RequestQueue
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -194,7 +209,6 @@ fun onDeleteClick(product: Product) {
     val index = productsAtHome.indexOf(product)
     if (index != -1) {
         productsAtHome.toMutableList().removeAt(index)
-        // Update UI to reflect product removal (call a function to refresh the list)
     }
 }
 
@@ -232,12 +246,109 @@ fun CartButton(onClick: () -> Unit) {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddItemPopup(
+    onDismissRequest: () -> Unit,
+    onConfirmationRequest: (String, String, String) -> Unit
+) {
+
+    fun convertMillisToLocalDate(millis: Long): LocalDate {
+        return Instant
+            .ofEpochMilli(millis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+    }
+
+    fun convertMillisToLocalDateWithFormatter(
+        date: LocalDate,
+        dateTimeFormatter: DateTimeFormatter
+    ): LocalDate {
+        //Convert the date to a long in millis using a date form mater
+        val dateInMillis = LocalDate.parse(date.format(dateTimeFormatter), dateTimeFormatter)
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        //Convert the millis to a localDate object
+        return Instant
+            .ofEpochMilli(dateInMillis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+    }
+
+    fun dateToString(date: LocalDate): String {
+        val dateFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMMM, yyyy", Locale.getDefault())
+        val dateInMillis = convertMillisToLocalDateWithFormatter(date, dateFormatter)
+        return dateFormatter.format(dateInMillis)
+    }
+
+    val dateState = rememberDatePickerState()
+    val millisToLocalDate = dateState.selectedDateMillis?.let {
+        convertMillisToLocalDate(it)
+    }
+    val expiryDate = millisToLocalDate?.let {
+        dateToString(millisToLocalDate)
+    } ?: ""
+    var name by remember { mutableStateOf("") }
+    var quantityText by remember { mutableStateOf("") }
+    var showDatePickerDialog by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = { onDismissRequest() }) {
+        Column {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name") }
+            )
+            OutlinedTextField(
+                value = quantityText,
+                onValueChange = { quantityText = it },
+                label = { Text("Quantity") }
+            )
+            if (showDatePickerDialog) {
+                DatePickerDialog(
+                    onDismissRequest = {
+                        showDatePickerDialog = false
+                    },
+                    confirmButton = {},
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                showDatePickerDialog = false
+                            }
+                        ) {
+                            Text("Cancel")
+                        }
+                    }
+                ) {
+                    DatePicker(
+                        state = dateState,
+                        showModeToggle = true
+                    )
+                }
+            }
+        }
+        Row {
+            TextButton(onClick = { onConfirmationRequest(name, quantityText, expiryDate) }) {
+                Text("Confirm")
+            }
+            TextButton(onClick = onDismissRequest) {
+                Text("Cancel")
+            }
+        }
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
     val prodInfo by txtProdInfo
     val prodImgUrl by imgProdUrl
     val ocrData by txtOcrData
     var currentListIndex by remember { mutableIntStateOf(0) }  // Initial index is 0 (first list)
+    var showAddItemPopup by remember { mutableStateOf(false) }
 
     Column(modifier) {
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -257,11 +368,18 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
             ) {
                 Icon(imageVector = Icons.Filled.DateRange, contentDescription = "Expire Date")
             }
-            IconButton(onClick = { /* Handle cart button click */ }) {
-                Icon(imageVector = Icons.Filled.ShoppingCart, contentDescription = "Cart")
-            }
-            IconButton(onClick = { /* Handle plus button click */ }) {
+            IconButton(onClick = { showAddItemPopup = true }) {
                 Icon(imageVector = Icons.Filled.Add, contentDescription = "Plus")
+            }
+            if (showAddItemPopup) {
+                AddItemPopup(
+                    onDismissRequest = { showAddItemPopup = false },
+                    onConfirmationRequest = { name, quantity, expiryDate ->
+                        val newProduct = Product(name, parseInt(quantity), expiryDate)
+                        productsAtHome.add(newProduct)
+                        showAddItemPopup = false // Dismiss popup after adding
+                    }
+                )
             }
             IconButton(
                 onClick = {
@@ -317,7 +435,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                         items(productsAtHome.size) { index ->
                             val product = productsAtHome[index]
                             ProductItem(product) { removedProduct ->
-                                productsAtHome.remove(removedProduct)
+                                onDeleteClick(removedProduct)
                             }
                         }
                     }
@@ -335,8 +453,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                         items(productsInCart.size) { index ->
                             val product = productsInCart[index]
                             ProductItem(product) { removedProduct ->
-                                productsInCart.remove(removedProduct)
-
+                                onDeleteClick(removedProduct)
                             }
                         }
                     }
@@ -355,6 +472,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Preview(showBackground = true)
 @Composable
 fun MainScreenPreview() {
