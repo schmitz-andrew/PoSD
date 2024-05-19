@@ -1,4 +1,4 @@
-package com.example.barcode
+package com.example.barcode.ui
 
 import android.content.ActivityNotFoundException
 import android.os.Build
@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import coil.compose.AsyncImage
 import com.android.volley.Request
 import com.android.volley.RequestQueue
@@ -54,9 +59,7 @@ import com.android.volley.toolbox.Volley
 import com.example.barcode.ui.theme.BarCodeTheme
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
-import com.google.mlkit.vision.text.Text
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.lang.Integer.parseInt
 import java.time.Instant
@@ -66,9 +69,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 
-val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 var code: String? = null
-var expDate: String? = null
 
 const val TAG = "TEST_CODE"
 
@@ -89,27 +90,13 @@ private val productsInCart = mutableListOf<Product>()
 
 class MainActivity : ComponentActivity() {
 
-    val getPictureResult =
-        registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-            run {
-                Log.d(TAG, bitmap.toString())
-                if (bitmap == null) {
-                    Log.e(TAG, "no bitmap returned")
-                } else {
-                    // TODO consider rotation, check aspect ratio
-                    recognizer.process(bitmap, 0)
-                        .addOnSuccessListener { text ->
-                            showOcrData(text)
-                        }
-                        .addOnCanceledListener {
-                            Log.e(TAG, "ocr cancelled!")
-                        }
-                        .addOnFailureListener { err ->
-                            run { Log.e(TAG, err.toString()) }
-                        }
-                }
-            }
+    val viewModel: MainViewModel by viewModels()
+
+    val getPictureResult = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) {
+        bitmap -> run {
+            viewModel.parseDateFromImage(bitmap, { Log.e(TAG, "ocr cancelled") }, { err -> run { Log.e(TAG, err.toString()) } })
         }
+    }
 
     lateinit var scanner: GmsBarcodeScanner
 
@@ -118,6 +105,12 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // TODO update ui elements?
+            }
+        }
 
         scanner = GmsBarcodeScanning.getClient(this)
         requestQueue = Volley.newRequestQueue(this)
@@ -138,7 +131,6 @@ class MainActivity : ComponentActivity() {
 
 val txtProdInfo = mutableStateOf("No barcode scanned")
 val imgProdUrl = mutableStateOf("")
-val txtOcrData = mutableStateOf("no ocr done")
 
 fun showProductInfo(prodJson: JSONObject) {
     val prodString = prodJson.toString(2)
@@ -160,12 +152,6 @@ fun showError(e: Exception) {
     txtProdInfo.value = "ERROR: ${e.message}"
 }
 
-fun showOcrData(text: Text) {
-    Log.d(TAG, text.text)
-    // TODO filter out expiry date
-    expDate = text.text
-    txtOcrData.value = text.text
-}
 
 @Composable
 fun ProductItem(product: Product, onRemoveClick: (Product) -> Unit) {
@@ -344,9 +330,10 @@ fun AddItemPopup(
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
-    val prodInfo by txtProdInfo
-    val prodImgUrl by imgProdUrl
-    val ocrData by txtOcrData
+    val uiState by activity.viewModel.uiState.collectAsStateWithLifecycle(
+        lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    )
+    val (prodInfo, prodImgUrl, ocrData) = uiState
     var currentListIndex by remember { mutableIntStateOf(0) }  // Initial index is 0 (first list)
     var showAddItemPopup by remember { mutableStateOf(false) }
 
@@ -407,7 +394,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                         .addOnFailureListener { err -> Log.e(TAG, err.toString()) }
                 }
             ) {
-                //TO-DO: Replace Star with QR-Code
+                //TODO: Replace Star with QR-Code
                 Icon(imageVector = Icons.Filled.Star, contentDescription = "QR Code")
             }
         }
