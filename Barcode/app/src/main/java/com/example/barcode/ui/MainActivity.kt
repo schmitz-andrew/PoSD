@@ -73,7 +73,9 @@ var code: String? = null
 
 const val TAG = "TEST_CODE"
 
-
+/***
+ * This class is a representation of a item in a list.
+ */
 data class Product(
     val name: String,
     val quantity: Int,
@@ -81,6 +83,9 @@ data class Product(
     var inCart: Boolean = false
 )
 
+/***
+ * Currently this as well as the list after are the temporary lists of products.
+ */
 private val productsAtHome = mutableListOf(
     Product("Product A", 2, "2024-05-30"),
     Product("Product B", 5, "2024-06-15")
@@ -152,7 +157,10 @@ fun showError(e: Exception) {
     txtProdInfo.value = "ERROR: ${e.message}"
 }
 
-
+/***
+ * This composable is the representation of a item in a list.
+ * It contains the presentation of the product but also two buttons to ether remove or move the item to the other list.
+ */
 @Composable
 fun ProductItem(product: Product, onRemoveClick: (Product) -> Unit) {
     Card(
@@ -160,6 +168,7 @@ fun ProductItem(product: Product, onRemoveClick: (Product) -> Unit) {
             .fillMaxWidth()
             .padding(8.dp)
     ) {
+        //Item information representation
         Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text(
                 text = product.name,
@@ -168,7 +177,9 @@ fun ProductItem(product: Product, onRemoveClick: (Product) -> Unit) {
             Text(text = "Qty: ${product.quantity}")
             Text(text = "Expires: ${product.expireDate}")
         }
+        //The buttons
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            //Ether a button to move to the cart or to the home list
             if (!product.inCart) {
                 IconButton(onClick = { onAddToCartClick(product) }) {
                     Icon(
@@ -181,6 +192,7 @@ fun ProductItem(product: Product, onRemoveClick: (Product) -> Unit) {
                     Icon(imageVector = Icons.Filled.Home, contentDescription = "Move to Home List")
                 }
             }
+            //The remove button
             IconButton(onClick = { onRemoveClick(product) }) {
                 Icon(imageVector = Icons.Filled.Close, contentDescription = "Delete")
             }
@@ -189,7 +201,9 @@ fun ProductItem(product: Product, onRemoveClick: (Product) -> Unit) {
 }
 
 
-// Implement click handler functions
+/***
+ * A function to delete an item out of a list.
+ */
 fun onDeleteClick(product: Product) {
     // Remove the product from the list (update data)
     val index = productsAtHome.indexOf(product)
@@ -198,6 +212,9 @@ fun onDeleteClick(product: Product) {
     }
 }
 
+/***
+ * A function to add an item to the cart list and remove at the same time it out of the home list.
+ */
 fun onAddToCartClick(product: Product) {
     val index = productsAtHome.indexOf(product)
     if (index != -1) {
@@ -208,6 +225,9 @@ fun onAddToCartClick(product: Product) {
     }
 }
 
+/***
+ * A function to add an item to the home list and remove at the same time it out of the cart list.
+ */
 fun onMoveToHomeClick(product: Product) {
     val index = productsInCart.indexOf(product)
     if (index != -1) {
@@ -218,20 +238,9 @@ fun onMoveToHomeClick(product: Product) {
     }
 }
 
-@Composable
-fun HomeButton(onClick: () -> Unit) {
-    Button(onClick = onClick) {
-        Text("At Home")
-    }
-}
-
-@Composable
-fun CartButton(onClick: () -> Unit) {
-    Button(onClick = onClick) {
-        Text("In Cart")
-    }
-}
-
+/***
+ * This composable function represents the popup window to add/modify an item of a list.
+ */
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -240,6 +249,7 @@ fun AddItemPopup(
     onConfirmationRequest: (String, String, String) -> Unit
 ) {
 
+    //A function to convert milliseconds to local date.
     fun convertMillisToLocalDate(millis: Long): LocalDate {
         return Instant
             .ofEpochMilli(millis)
@@ -247,29 +257,32 @@ fun AddItemPopup(
             .toLocalDate()
     }
 
+    //A function to convert milliseconds to local date with format.
     fun convertMillisToLocalDateWithFormatter(
         date: LocalDate,
         dateTimeFormatter: DateTimeFormatter
     ): LocalDate {
-        //Convert the date to a long in millis using a date form mater
+        //Convert the date to a long in millis using a date form mater.
         val dateInMillis = LocalDate.parse(date.format(dateTimeFormatter), dateTimeFormatter)
             .atStartOfDay(ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli()
 
-        //Convert the millis to a localDate object
+        //Convert the millis to a localDate object.
         return Instant
             .ofEpochMilli(dateInMillis)
             .atZone(ZoneId.systemDefault())
             .toLocalDate()
     }
 
+    //A function to convert a date to a string.
     fun dateToString(date: LocalDate): String {
         val dateFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMMM, yyyy", Locale.getDefault())
         val dateInMillis = convertMillisToLocalDateWithFormatter(date, dateFormatter)
         return dateFormatter.format(dateInMillis)
     }
 
+    //A val to keep track of the date
     val dateState = rememberDatePickerState()
     val millisToLocalDate = dateState.selectedDateMillis?.let {
         convertMillisToLocalDate(it)
@@ -405,8 +418,12 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                HomeButton { onListChange(0) }
-                CartButton { onListChange(1) }
+                Button(onClick = { onListChange(0) }) {
+                    Text("At Home")
+                }
+                Button(onClick = { onListChange(1) }) {
+                    Text("In Cart")
+                }
             }
 
             when (currentListIndex) {
