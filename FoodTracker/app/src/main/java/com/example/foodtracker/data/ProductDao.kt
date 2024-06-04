@@ -1,9 +1,11 @@
 package com.example.foodtracker.data
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 
@@ -25,5 +27,11 @@ interface ProductDao {
     // TODO: how to deal with adding multiples? maybe at higher level i.e. do helper funs to update instead?
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(product: Product): Long
+
+    @Delete
+    suspend fun remove(product: Product)
+
+    @Update
+    suspend fun update(product: Product)
 
 }

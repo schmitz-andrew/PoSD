@@ -105,4 +105,30 @@ class ProductDaoTest {
         assertEquals(product2, cartProducts[1])
     }
 
+    @Test
+    fun productDaoRemove_RemovesProductFromDb() = runBlocking {
+        addFourProductsToDb()
+        productDao.remove(product3)
+
+        val cartProducts = productDao.getAllProducts().first()
+
+        assertEquals(3, cartProducts.size)
+        assertEquals(product2, cartProducts[0])
+        assertEquals(product1, cartProducts[1])
+        assertEquals(product4, cartProducts[2])
+    }
+
+    @Test
+    fun productDaoUpdate_UpdatesProductInDb() = runBlocking {
+        addFourProductsToDb()
+        productDao.update(product3.copy(inCart = !product3.inCart))
+
+        val allProducts = productDao.getAllProducts().first()
+
+        assertEquals(product2, allProducts[0])
+        assertEquals(product1, allProducts[1])
+        assertEquals(product4, allProducts[2])
+        assertEquals(product3.copy(inCart = !product3.inCart), allProducts[3])
+    }
+
 }
