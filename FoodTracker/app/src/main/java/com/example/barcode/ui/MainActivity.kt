@@ -56,7 +56,7 @@ import com.android.volley.RequestQueue
 import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
-import com.example.barcode.ui.theme.BarCodeTheme
+import com.example.barcode.ui.theme.FoodTrackerTheme
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.launch
@@ -121,7 +121,7 @@ class MainActivity : ComponentActivity() {
         requestQueue = Volley.newRequestQueue(this)
 
         setContent {
-            BarCodeTheme {
+            FoodTrackerTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -480,7 +480,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
 @Preview(showBackground = true)
 @Composable
 fun MainScreenPreview() {
-    BarCodeTheme {
+    FoodTrackerTheme {
         MainScreen(MainActivity(), modifier = Modifier)
     }
 }

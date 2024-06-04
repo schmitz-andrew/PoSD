@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Bar code"
+rootProject.name = "Food Tracker"
 include(":app")
