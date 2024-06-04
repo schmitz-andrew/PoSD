@@ -32,15 +32,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -73,33 +77,18 @@ var code: String? = null
 
 const val TAG = "TEST_CODE"
 
-/***
- * This class is a representation of a item in a list.
- */
-data class Product(
-    val name: String,
-    val quantity: Int,
-    val expireDate: String,
-    var inCart: Boolean = false
-)
-
-/***
- * Currently this as well as the list after are the temporary lists of products.
- */
-private val productsAtHome = mutableListOf(
-    Product("Product A", 2, "2024-05-30"),
-    Product("Product B", 5, "2024-06-15")
-)
-
-private val productsInCart = mutableListOf<Product>()
 
 class MainActivity : ComponentActivity() {
 
-    val viewModel: MainViewModel by viewModels()
+    val viewModel: MainViewModel by viewModels(factoryProducer = { MainViewModel.factory })
 
     val getPictureResult = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) {
         bitmap -> run {
-            viewModel.parseDateFromImage(bitmap, { Log.e(TAG, "ocr cancelled") }, { err -> run { Log.e(TAG, err.toString()) } })
+            viewModel.parseDateFromImage(
+                bitmap,
+                { Log.e(TAG, "ocr cancelled") },
+                { err -> run { Log.e(TAG, err.toString()) } }
+            )
         }
     }
 
@@ -111,11 +100,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                // TODO update ui elements?
-            }
-        }
+//        lifecycleScope.launch {
+//            repeatOnLifecycle(Lifecycle.State.STARTED) {
+//                // TODO update ui elements?
+//            }
+//        }
 
         scanner = GmsBarcodeScanning.getClient(this)
         requestQueue = Volley.newRequestQueue(this)
@@ -123,11 +112,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             FoodTrackerTheme {
                 // A surface container using the 'background' color from the theme
-                Surface(
+                Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    containerColor = MaterialTheme.colorScheme.background
                 ) {
-                    MainScreen(this)
+                    MainScreen(this, Modifier.padding(it))
                 }
             }
         }
@@ -162,7 +151,12 @@ fun showError(e: Exception) {
  * It contains the presentation of the product but also two buttons to ether remove or move the item to the other list.
  */
 @Composable
-fun ProductItem(product: Product, onRemoveClick: (Product) -> Unit) {
+fun ProductItem(
+    product: ProductDetailsUiState,
+    onAddToCart: (ProductDetailsUiState) -> Unit,
+    onMoveToHome: (ProductDetailsUiState) -> Unit,
+    onRemoveClick: (ProductDetailsUiState) -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -175,20 +169,20 @@ fun ProductItem(product: Product, onRemoveClick: (Product) -> Unit) {
                 modifier = Modifier.weight(1f),
             )
             Text(text = "Qty: ${product.quantity}")
-            Text(text = "Expires: ${product.expireDate}")
+            Text(text = "Expires: ${product.expiryDate ?: "unknown"}")
         }
         //The buttons
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             //Ether a button to move to the cart or to the home list
             if (!product.inCart) {
-                IconButton(onClick = { onAddToCartClick(product) }) {
+                IconButton(onClick = { onAddToCart(product) }) {
                     Icon(
                         imageVector = Icons.Filled.ShoppingCart,
                         contentDescription = "Add to Cart"
                     )
                 }
             } else {
-                IconButton(onClick = { onMoveToHomeClick(product.copy()) }) { // Create a copy to avoid mutating original list
+                IconButton(onClick = { onMoveToHome(product) }) {
                     Icon(imageVector = Icons.Filled.Home, contentDescription = "Move to Home List")
                 }
             }
@@ -200,43 +194,6 @@ fun ProductItem(product: Product, onRemoveClick: (Product) -> Unit) {
     }
 }
 
-
-/***
- * A function to delete an item out of a list.
- */
-fun onDeleteClick(product: Product) {
-    // Remove the product from the list (update data)
-    val index = productsAtHome.indexOf(product)
-    if (index != -1) {
-        productsAtHome.toMutableList().removeAt(index)
-    }
-}
-
-/***
- * A function to add an item to the cart list and remove at the same time it out of the home list.
- */
-fun onAddToCartClick(product: Product) {
-    val index = productsAtHome.indexOf(product)
-    if (index != -1) {
-        val newProduct = productsAtHome[index]
-        newProduct.inCart = true
-        productsInCart.add(newProduct)
-        productsAtHome.removeAt(index)
-    }
-}
-
-/***
- * A function to add an item to the home list and remove at the same time it out of the cart list.
- */
-fun onMoveToHomeClick(product: Product) {
-    val index = productsInCart.indexOf(product)
-    if (index != -1) {
-        val newProduct = productsInCart[index]
-        product.inCart = false
-        productsAtHome.add(newProduct)
-        productsInCart.removeAt(index)
-    }
-}
 
 /***
  * This composable function represents the popup window to add/modify an item of a list.
@@ -328,13 +285,14 @@ fun AddItemPopup(
                     )
                 }
             }
-        }
-        Row {
-            TextButton(onClick = { onConfirmationRequest(name, quantityText, expiryDate) }) {
-                Text("Confirm")
-            }
-            TextButton(onClick = onDismissRequest) {
-                Text("Cancel")
+
+            Row {
+                TextButton(onClick = { onConfirmationRequest(name, quantityText, expiryDate) }) {
+                    Text("Confirm")
+                }
+                TextButton(onClick = onDismissRequest) {
+                    Text("Cancel")
+                }
             }
         }
     }
@@ -343,12 +301,17 @@ fun AddItemPopup(
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
+
+    val coroutineScope = rememberCoroutineScope()
+
     val uiState by activity.viewModel.uiState.collectAsStateWithLifecycle(
         lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     )
-    val (prodInfo, prodImgUrl, ocrData) = uiState
-    var currentListIndex by remember { mutableIntStateOf(0) }  // Initial index is 0 (first list)
-    var showAddItemPopup by remember { mutableStateOf(false) }
+    val (prodInfo, prodImgUrl, ocrData, currentList ) = uiState
+    var showAddItemPopup by rememberSaveable { mutableStateOf(false) }
+
+    val productsAtHome by activity.viewModel.getProductsAtHome().collectAsState(emptyList())
+    val productsInCart by activity.viewModel.getProductsInCart().collectAsState(emptyList())
 
     Column(modifier) {
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -366,7 +329,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                     }
                 }
             ) {
-                Icon(imageVector = Icons.Filled.DateRange, contentDescription = "Expire Date")
+                Icon(imageVector = Icons.Filled.DateRange, contentDescription = "Expiry Date")
             }
             IconButton(onClick = { showAddItemPopup = true }) {
                 Icon(imageVector = Icons.Filled.Add, contentDescription = "Plus")
@@ -374,11 +337,13 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
             if (showAddItemPopup) {
                 AddItemPopup(
                     onDismissRequest = { showAddItemPopup = false },
-                    onConfirmationRequest = { name, quantity, expiryDate ->
-                        val newProduct = Product(name, parseInt(quantity), expiryDate)
-                        productsAtHome.add(newProduct)
-                        showAddItemPopup = false // Dismiss popup after adding
-                    }
+                    onConfirmationRequest = { name, quantity, expiryDate -> coroutineScope.launch {
+                        val quantityInt = quantity.toIntOrNull()
+                        if (quantityInt != null) {
+                            activity.viewModel.insertProductAtHome(name, quantityInt, expiryDate)
+                            showAddItemPopup = false // Dismiss popup after adding
+                        }
+                    } }
                 )
             }
             IconButton(
@@ -411,54 +376,77 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                 Icon(imageVector = Icons.Filled.Star, contentDescription = "QR Code")
             }
         }
-        val onListChange = { newIndex: Int -> currentListIndex = newIndex }
 
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.weight(1f)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Button(onClick = { onListChange(0) }) {
+                Button(
+                    onClick = { activity.viewModel.switchToHomeList() },
+                    enabled = currentList != LIST.Home
+                ) {
                     Text("At Home")
                 }
-                Button(onClick = { onListChange(1) }) {
+                Button(
+                    onClick = { activity.viewModel.switchToCartList() },
+                    enabled = currentList != LIST.Cart
+                ) {
                     Text("In Cart")
                 }
             }
 
-            when (currentListIndex) {
-                0 -> LazyColumn(modifier = Modifier.weight(1f)) {
+            when (currentList) {
+                LIST.Home -> LazyColumn(modifier = Modifier.weight(1f)) {
                     if (productsAtHome.isEmpty()) {
-                        item {
+                        item(0) {
                             Text(
                                 text = "You don't have any food at home.",
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
                     } else {
-                        items(productsAtHome.size) { index ->
+                        items(productsAtHome.size, { productsAtHome[it].id }) { index ->
                             val product = productsAtHome[index]
-                            ProductItem(product) { removedProduct ->
-                                onDeleteClick(removedProduct)
-                            }
+                            ProductItem(
+                                product,
+                                onAddToCart = { coroutineScope.launch {
+                                    activity.viewModel.moveProductToCart(it.id)
+                                } },
+                                onMoveToHome = { coroutineScope.launch {
+                                    activity.viewModel.moveProductToHome(it.id)
+                                } },
+                                onRemoveClick = { coroutineScope.launch {
+                                    activity.viewModel.removeProduct(it.id)
+                                } }
+                            )
                         }
                     }
                 }
 
-                1 -> LazyColumn(modifier = Modifier.weight(1f)) {
+                LIST.Cart -> LazyColumn(modifier = Modifier.weight(1f)) {
                     if (productsInCart.isEmpty()) {
-                        item {
+                        item(0) {
                             Text(
                                 text = "Your shopping list is empty.",
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
                     } else {
-                        items(productsInCart.size) { index ->
+                        items(productsInCart.size, { productsInCart[it].id }) { index ->
                             val product = productsInCart[index]
-                            ProductItem(product) { removedProduct ->
-                                onDeleteClick(removedProduct)
-                            }
+                            ProductItem(
+                                product,
+                                onAddToCart = { coroutineScope.launch {
+                                    activity.viewModel.moveProductToCart(it.id)
+                                } },
+                                onMoveToHome = { coroutineScope.launch {
+                                    activity.viewModel.moveProductToHome(it.id)
+                                } },
+                                onRemoveClick = { coroutineScope.launch {
+                                    activity.viewModel.removeProduct(it.id)
+                                } }
+                            )
                         }
                     }
                 }
