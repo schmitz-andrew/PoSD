@@ -1,4 +1,4 @@
-package com.example.barcode
+package com.example.foodtracker
 
 import org.junit.Test
 

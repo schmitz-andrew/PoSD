@@ -1,4 +1,4 @@
-package com.example.barcode.ui
+package com.example.foodtracker.ui
 
 import android.graphics.Bitmap
 import android.util.Log

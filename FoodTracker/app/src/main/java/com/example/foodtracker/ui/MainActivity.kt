@@ -1,4 +1,4 @@
-package com.example.barcode.ui
+package com.example.foodtracker.ui
 
 import android.content.ActivityNotFoundException
 import android.os.Build
@@ -56,7 +56,7 @@ import com.android.volley.RequestQueue
 import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
-import com.example.barcode.ui.theme.FoodTrackerTheme
+import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.launch

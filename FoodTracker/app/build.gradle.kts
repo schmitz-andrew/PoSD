@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.barcode"
+    namespace = "com.example.foodtracker"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.barcode"
+        applicationId = "com.example.foodtracker"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

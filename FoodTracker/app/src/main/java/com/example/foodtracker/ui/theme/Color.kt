@@ -1,4 +1,4 @@
-package com.example.barcode.ui.theme
+package com.example.foodtracker.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
