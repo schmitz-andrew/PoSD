@@ -34,10 +34,10 @@ jobs:
       uses: gradle/actions/setup-gradle@417ae3ccd767c252f5661f1ace9f835f9654f2b5 # v3.1.0
 
     - name: Make gradle wrapper executable
-      run: cd ./Barcode && chmod +x gradlew
+      run: cd ./FoodTracker && chmod +x gradlew
       
     - name: Build with Gradle Wrapper
-      run: cd ./Barcode && ./gradlew build
+      run: cd ./FoodTracker && ./gradlew build
 
   dependency-submission:
 
@@ -58,7 +58,7 @@ jobs:
     - name: Generate and submit dependency graph
       uses: gradle/actions/dependency-submission@417ae3ccd767c252f5661f1ace9f835f9654f2b5 # v3.1.0
       with:
-        build-root-directory: Barcode
+        build-root-directory: FoodTracker
 
         # Do not attempt to submit the dependency-graph. Save it as a workflow artifact.
         dependency-graph: generate-and-upload

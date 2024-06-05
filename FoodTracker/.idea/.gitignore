@@ -1,0 +1,8 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+
+# User preferences
+/androidTestResultsUserPreferences.xml
+/deploymentTarget*.xml
+/studiobot.xml
