@@ -9,7 +9,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,6 +49,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -82,15 +85,16 @@ class MainActivity : ComponentActivity() {
 
     val viewModel: MainViewModel by viewModels(factoryProducer = { MainViewModel.factory })
 
-    val getPictureResult = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) {
-        bitmap -> run {
-            viewModel.parseDateFromImage(
-                bitmap,
-                { Log.e(TAG, "ocr cancelled") },
-                { err -> run { Log.e(TAG, err.toString()) } }
-            )
+    val getPictureResult =
+        registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+            run {
+                viewModel.parseDateFromImage(
+                    bitmap,
+                    { Log.e(TAG, "ocr cancelled") },
+                    { err -> run { Log.e(TAG, err.toString()) } }
+                )
+            }
         }
-    }
 
     lateinit var scanner: GmsBarcodeScanner
 
@@ -252,46 +256,54 @@ fun AddItemPopup(
     var showDatePickerDialog by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = { onDismissRequest() }) {
-        Column {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Name") }
-            )
-            OutlinedTextField(
-                value = quantityText,
-                onValueChange = { quantityText = it },
-                label = { Text("Quantity") }
-            )
-            if (showDatePickerDialog) {
-                DatePickerDialog(
-                    onDismissRequest = {
-                        showDatePickerDialog = false
-                    },
-                    confirmButton = {},
-                    dismissButton = {
-                        TextButton(
-                            onClick = {
-                                showDatePickerDialog = false
+        Box(Modifier.background(color = Color.White)) {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") }
+                )
+                OutlinedTextField(
+                    value = quantityText,
+                    onValueChange = { quantityText = it },
+                    label = { Text("Quantity") }
+                )
+                if (showDatePickerDialog) {
+                    DatePickerDialog(
+                        onDismissRequest = {
+                            showDatePickerDialog = false
+                        },
+                        confirmButton = {},
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    showDatePickerDialog = false
+                                }
+                            ) {
+                                Text("Cancel")
                             }
-                        ) {
-                            Text("Cancel")
                         }
+                    ) {
+                        DatePicker(
+                            state = dateState,
+                            showModeToggle = true
+                        )
                     }
-                ) {
-                    DatePicker(
-                        state = dateState,
-                        showModeToggle = true
-                    )
                 }
-            }
 
-            Row {
-                TextButton(onClick = { onConfirmationRequest(name, quantityText, expiryDate) }) {
-                    Text("Confirm")
-                }
-                TextButton(onClick = onDismissRequest) {
-                    Text("Cancel")
+                Row {
+                    TextButton(onClick = {
+                        onConfirmationRequest(
+                            name,
+                            quantityText,
+                            expiryDate
+                        )
+                    }) {
+                        Text("Confirm")
+                    }
+                    TextButton(onClick = onDismissRequest) {
+                        Text("Cancel")
+                    }
                 }
             }
         }
@@ -307,7 +319,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
     val uiState by activity.viewModel.uiState.collectAsStateWithLifecycle(
         lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     )
-    val (prodInfo, prodImgUrl, ocrData, currentList ) = uiState
+    val (prodInfo, prodImgUrl, ocrData, currentList) = uiState
     var showAddItemPopup by rememberSaveable { mutableStateOf(false) }
 
     val productsAtHome by activity.viewModel.getProductsAtHome().collectAsState(emptyList())
@@ -337,13 +349,19 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
             if (showAddItemPopup) {
                 AddItemPopup(
                     onDismissRequest = { showAddItemPopup = false },
-                    onConfirmationRequest = { name, quantity, expiryDate -> coroutineScope.launch {
-                        val quantityInt = quantity.toIntOrNull()
-                        if (quantityInt != null) {
-                            activity.viewModel.insertProductAtHome(name, quantityInt, expiryDate)
-                            showAddItemPopup = false // Dismiss popup after adding
+                    onConfirmationRequest = { name, quantity, expiryDate ->
+                        coroutineScope.launch {
+                            val quantityInt = quantity.toIntOrNull()
+                            if (quantityInt != null) {
+                                activity.viewModel.insertProductAtHome(
+                                    name,
+                                    quantityInt,
+                                    expiryDate
+                                )
+                                showAddItemPopup = false // Dismiss popup after adding
+                            }
                         }
-                    } }
+                    }
                 )
             }
             IconButton(
@@ -410,15 +428,21 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                             val product = productsAtHome[index]
                             ProductItem(
                                 product,
-                                onAddToCart = { coroutineScope.launch {
-                                    activity.viewModel.moveProductToCart(it.id)
-                                } },
-                                onMoveToHome = { coroutineScope.launch {
-                                    activity.viewModel.moveProductToHome(it.id)
-                                } },
-                                onRemoveClick = { coroutineScope.launch {
-                                    activity.viewModel.removeProduct(it.id)
-                                } }
+                                onAddToCart = {
+                                    coroutineScope.launch {
+                                        activity.viewModel.moveProductToCart(it.id)
+                                    }
+                                },
+                                onMoveToHome = {
+                                    coroutineScope.launch {
+                                        activity.viewModel.moveProductToHome(it.id)
+                                    }
+                                },
+                                onRemoveClick = {
+                                    coroutineScope.launch {
+                                        activity.viewModel.removeProduct(it.id)
+                                    }
+                                }
                             )
                         }
                     }
@@ -437,15 +461,21 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                             val product = productsInCart[index]
                             ProductItem(
                                 product,
-                                onAddToCart = { coroutineScope.launch {
-                                    activity.viewModel.moveProductToCart(it.id)
-                                } },
-                                onMoveToHome = { coroutineScope.launch {
-                                    activity.viewModel.moveProductToHome(it.id)
-                                } },
-                                onRemoveClick = { coroutineScope.launch {
-                                    activity.viewModel.removeProduct(it.id)
-                                } }
+                                onAddToCart = {
+                                    coroutineScope.launch {
+                                        activity.viewModel.moveProductToCart(it.id)
+                                    }
+                                },
+                                onMoveToHome = {
+                                    coroutineScope.launch {
+                                        activity.viewModel.moveProductToHome(it.id)
+                                    }
+                                },
+                                onRemoveClick = {
+                                    coroutineScope.launch {
+                                        activity.viewModel.removeProduct(it.id)
+                                    }
+                                }
                             )
                         }
                     }
