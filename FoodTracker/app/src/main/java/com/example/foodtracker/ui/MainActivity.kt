@@ -10,16 +10,21 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
@@ -29,6 +34,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
@@ -130,15 +138,16 @@ class MainActivity : ComponentActivity() {
 val txtProdInfo = mutableStateOf("No barcode scanned")
 val imgProdUrl = mutableStateOf("")
 
+
 fun showProductInfo(prodJson: JSONObject) {
     val prodString = prodJson.toString(2)
-    val prodCode = prodJson.get("code")
+    //val prodCode = prodJson.get("code")
     val prodObj = prodJson.getJSONObject("product")
     val prodName = prodObj.get("product_name")
     val prodImg = prodObj.get("image_small_url")
 
     Log.i(TAG, prodString)
-    txtProdInfo.value = "Code: $prodCode\nProduct name: $prodName"
+    txtProdInfo.value = "$prodName"
 
     if (prodImg.toString().isNotBlank()) {
         imgProdUrl.value = prodImg.toString()
@@ -168,12 +177,11 @@ fun ProductItem(
     ) {
         //Item information representation
         Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(
-                text = product.name,
-                modifier = Modifier.weight(1f),
-            )
-            Text(text = "Qty: ${product.quantity}")
-            Text(text = "Expires: ${product.expiryDate ?: "unknown"}")
+            Column {
+                Text(text = product.name)
+                Text(text = "Qty: ${product.quantity}")
+                Text(text = "Expires: ${product.expiryDate ?: "unknown"}")
+            }
         }
         //The buttons
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -200,6 +208,66 @@ fun ProductItem(
 
 
 /***
+ * This composable is a dropdown menu which contains the numbers 1-100.
+ */
+@Composable
+fun ScrollableNumberDropdown(
+    currentValue: Int,
+    onValueChanged: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    IconButton(onClick = { expanded = !expanded }) {
+        Icon(Icons.Filled.ArrowDropDown, contentDescription = "Select Quantity")
+    }
+
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = { expanded = false },
+        modifier = Modifier.fillMaxHeight(0.5f)
+    ) {
+        (1..100).forEach { number ->
+            DropdownMenuItem(onClick = {
+                expanded = false
+                onValueChanged(number)
+            }, text = {
+                Text(text = number.toString())
+            })
+        }
+    }
+}
+
+/***
+ * This composable is a flip button which ether represents the expiry date or the bought date.
+ */
+@Composable
+fun FlipButton(
+    text: String,
+    onClick: () -> Unit,
+    isFlipped: Boolean = true
+) {
+    var flipped by remember { mutableStateOf(isFlipped) }
+
+    Box(
+        modifier = Modifier
+            .clickable { flipped = !flipped; onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .background(
+                color = if (flipped) Color.Blue else Color.LightGray,
+                shape = RoundedCornerShape(8.dp)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        if (flipped) {
+            Text(text = "Expiry date", color = Color.White)
+        } else {
+            Text(text = "Bought date", color = Color.Black)
+        }
+    }
+}
+
+
+/***
  * This composable function represents the popup window to add/modify an item of a list.
  */
 @RequiresApi(Build.VERSION_CODES.O)
@@ -207,7 +275,8 @@ fun ProductItem(
 @Composable
 fun AddItemPopup(
     onDismissRequest: () -> Unit,
-    onConfirmationRequest: (String, String, String) -> Unit
+    onConfirmationRequest: (String, String, String) -> Unit,
+    pName: String,
 ) {
 
     //A function to convert milliseconds to local date.
@@ -251,10 +320,11 @@ fun AddItemPopup(
     val expiryDate = millisToLocalDate?.let {
         dateToString(millisToLocalDate)
     } ?: ""
-    var name by remember { mutableStateOf("") }
-    var quantityText by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(pName) }
+    var quantityText by remember { mutableStateOf("0") }
     var showDatePickerDialog by remember { mutableStateOf(false) }
-
+    var selectedNumber by remember { mutableStateOf(1) }
+    var isFlipped by remember { mutableStateOf((true)) }
     Dialog(onDismissRequest = { onDismissRequest() }) {
         Box(Modifier.background(color = Color.White)) {
             Column {
@@ -263,11 +333,30 @@ fun AddItemPopup(
                     onValueChange = { name = it },
                     label = { Text("Name") }
                 )
-                OutlinedTextField(
-                    value = quantityText,
-                    onValueChange = { quantityText = it },
-                    label = { Text("Quantity") }
-                )
+                Row {
+                    Text(text = "Quantity: $quantityText")
+                    ScrollableNumberDropdown(
+                        currentValue = selectedNumber,
+                        onValueChanged = { newValue ->
+                            quantityText = newValue.toString()
+                        })
+                }
+                Row {
+                    FlipButton(text = "Date button", onClick = { isFlipped = !isFlipped })
+                }
+                Row {
+                    if (isFlipped) {
+                        Text(text = "Expiry Date: $expiryDate")
+                    } else {
+                        Text(text = "Bought Date $expiryDate")
+                    }
+                    IconButton(onClick = { showDatePickerDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.DateRange,
+                            contentDescription = "Choose a date"
+                        )
+                    }
+                }
                 if (showDatePickerDialog) {
                     DatePickerDialog(
                         onDismissRequest = {
@@ -351,17 +440,19 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                     onDismissRequest = { showAddItemPopup = false },
                     onConfirmationRequest = { name, quantity, expiryDate ->
                         coroutineScope.launch {
-                            val quantityInt = quantity.toIntOrNull()
-                            if (quantityInt != null) {
-                                activity.viewModel.insertProductAtHome(
-                                    name,
-                                    quantityInt,
-                                    expiryDate
-                                )
-                                showAddItemPopup = false // Dismiss popup after adding
+                            var quantityInt = quantity.toIntOrNull()
+                            if (quantityInt == null) {
+                                quantityInt = 0
                             }
+                            activity.viewModel.insertProductAtHome(
+                                name,
+                                quantityInt,
+                                expiryDate
+                            )
+                            showAddItemPopup = false
                         }
-                    }
+                    },
+                    pName = txtProdInfo.value
                 )
             }
             IconButton(
@@ -388,10 +479,11 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                         }
                         .addOnCanceledListener { Log.e(TAG, "cancelled!") }
                         .addOnFailureListener { err -> Log.e(TAG, err.toString()) }
+                    showAddItemPopup = true
                 }
             ) {
                 //TODO: Replace Star with QR-Code
-                Icon(imageVector = Icons.Filled.Star, contentDescription = "QR Code")
+                Icon(imageVector = Icons.Filled.AddCircle, contentDescription = "QR Code")
             }
         }
 
