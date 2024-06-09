@@ -81,6 +81,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 
@@ -180,7 +181,9 @@ fun ProductItem(
             Column {
                 Text(text = product.name)
                 Text(text = "Qty: ${product.quantity}")
-                Text(text = "Expires: ${product.expiryDate ?: "unknown"}")
+                if (!product.inCart) {
+                    Text(text = "Expires: ${product.expiryDate ?: "unknown"}")
+                }
             }
         }
         //The buttons
@@ -292,7 +295,7 @@ fun AddItemPopup(
         date: LocalDate,
         dateTimeFormatter: DateTimeFormatter
     ): LocalDate {
-        //Convert the date to a long in millis using a date form mater.
+        //Convert the date to a long in millis using a date formatter.
         val dateInMillis = LocalDate.parse(date.format(dateTimeFormatter), dateTimeFormatter)
             .atStartOfDay(ZoneId.systemDefault())
             .toInstant()
@@ -307,9 +310,20 @@ fun AddItemPopup(
 
     //A function to convert a date to a string.
     fun dateToString(date: LocalDate): String {
-        val dateFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMMM, yyyy", Locale.getDefault())
+        val dateFormatter = DateTimeFormatter.ISO_DATE
         val dateInMillis = convertMillisToLocalDateWithFormatter(date, dateFormatter)
         return dateFormatter.format(dateInMillis)
+    }
+
+    fun addWeeksToDate(expiryDate: String, number: Long): String {
+        val formatter = DateTimeFormatter.ISO_DATE
+        val localDate = try {
+            LocalDate.parse(expiryDate, formatter)
+        } catch (e: Exception) {
+            LocalDate.now()
+        }
+        val oneWeekLater = localDate.plus(number, ChronoUnit.WEEKS)
+        return oneWeekLater.toString()
     }
 
     //A val to keep track of the date
@@ -317,9 +331,11 @@ fun AddItemPopup(
     val millisToLocalDate = dateState.selectedDateMillis?.let {
         convertMillisToLocalDate(it)
     }
-    val expiryDate = millisToLocalDate?.let {
-        dateToString(millisToLocalDate)
-    } ?: ""
+    var expiryDate by remember {
+        mutableStateOf(millisToLocalDate?.let {
+            dateToString(millisToLocalDate)
+        } ?: LocalDate.now().format(DateTimeFormatter.ISO_DATE).toString())
+    }
     var name by remember { mutableStateOf(pName) }
     var quantityText by remember { mutableStateOf("0") }
     var showDatePickerDialog by remember { mutableStateOf(false) }
@@ -341,9 +357,7 @@ fun AddItemPopup(
                             quantityText = newValue.toString()
                         })
                 }
-                Row {
-                    FlipButton(text = "Date button", onClick = { isFlipped = !isFlipped })
-                }
+                FlipButton(text = "Date button", onClick = { isFlipped = !isFlipped })
                 Row {
                     if (isFlipped) {
                         Text(text = "Expiry Date: $expiryDate")
@@ -355,6 +369,24 @@ fun AddItemPopup(
                             imageVector = Icons.Filled.DateRange,
                             contentDescription = "Choose a date"
                         )
+                    }
+                }
+                Row {
+                    Text(text = "Weeks to add:")
+                    Button(onClick = {
+                        expiryDate = addWeeksToDate(expiryDate, 1)
+                    }) {
+                        Text(text = "1")
+                    }
+                    Button(onClick = {
+                        expiryDate = addWeeksToDate(expiryDate, 2)
+                    }) {
+                        Text(text = "2")
+                    }
+                    Button(onClick = {
+                        expiryDate = addWeeksToDate(expiryDate, 3)
+                    }) {
+                        Text(text = "3")
                     }
                 }
                 if (showDatePickerDialog) {
