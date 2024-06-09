@@ -57,6 +57,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -81,6 +82,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 
@@ -93,7 +95,7 @@ class MainActivity : ComponentActivity() {
 
     val viewModel: MainViewModel by viewModels(factoryProducer = { MainViewModel.factory })
 
-    val getPictureResult =
+    /*val getPictureResult =
         registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
             run {
                 viewModel.parseDateFromImage(
@@ -102,7 +104,7 @@ class MainActivity : ComponentActivity() {
                     { err -> run { Log.e(TAG, err.toString()) } }
                 )
             }
-        }
+        }*/
 
     lateinit var scanner: GmsBarcodeScanner
 
@@ -180,7 +182,9 @@ fun ProductItem(
             Column {
                 Text(text = product.name)
                 Text(text = "Qty: ${product.quantity}")
-                Text(text = "Expires: ${product.expiryDate ?: "unknown"}")
+                if (!product.inCart) {
+                    Text(text = "Expires: ${product.expiryDate ?: "unknown"}")
+                }
             }
         }
         //The buttons
@@ -259,9 +263,9 @@ fun FlipButton(
         contentAlignment = Alignment.Center
     ) {
         if (flipped) {
-            Text(text = "Expiry date", color = Color.White)
+            Text(text = "Expiry date", color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         } else {
-            Text(text = "Bought date", color = Color.Black)
+            Text(text = "Bought date", color = Color.Black, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
     }
 }
@@ -292,7 +296,7 @@ fun AddItemPopup(
         date: LocalDate,
         dateTimeFormatter: DateTimeFormatter
     ): LocalDate {
-        //Convert the date to a long in millis using a date form mater.
+        //Convert the date to a long in millis using a date formatter.
         val dateInMillis = LocalDate.parse(date.format(dateTimeFormatter), dateTimeFormatter)
             .atStartOfDay(ZoneId.systemDefault())
             .toInstant()
@@ -307,9 +311,20 @@ fun AddItemPopup(
 
     //A function to convert a date to a string.
     fun dateToString(date: LocalDate): String {
-        val dateFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMMM, yyyy", Locale.getDefault())
+        val dateFormatter = DateTimeFormatter.ISO_DATE
         val dateInMillis = convertMillisToLocalDateWithFormatter(date, dateFormatter)
         return dateFormatter.format(dateInMillis)
+    }
+
+    fun addWeeksToDate(expiryDate: String, number: Long): String {
+        val formatter = DateTimeFormatter.ISO_DATE
+        val localDate = try {
+            LocalDate.parse(expiryDate, formatter)
+        } catch (e: Exception) {
+            LocalDate.now()
+        }
+        val oneWeekLater = localDate.plus(number, ChronoUnit.WEEKS)
+        return oneWeekLater.toString()
     }
 
     //A val to keep track of the date
@@ -317,23 +332,27 @@ fun AddItemPopup(
     val millisToLocalDate = dateState.selectedDateMillis?.let {
         convertMillisToLocalDate(it)
     }
-    val expiryDate = millisToLocalDate?.let {
-        dateToString(millisToLocalDate)
-    } ?: ""
+    var expiryDate by remember {
+        mutableStateOf(millisToLocalDate?.let {
+            dateToString(millisToLocalDate)
+        } ?: LocalDate.now().format(DateTimeFormatter.ISO_DATE).toString())
+    }
     var name by remember { mutableStateOf(pName) }
     var quantityText by remember { mutableStateOf("0") }
     var showDatePickerDialog by remember { mutableStateOf(false) }
     var selectedNumber by remember { mutableStateOf(1) }
     var isFlipped by remember { mutableStateOf((true)) }
     Dialog(onDismissRequest = { onDismissRequest() }) {
-        Box(Modifier.background(color = Color.White)) {
-            Column {
+        Box(Modifier.background(color = Color.White)
+            .clickable { onDismissRequest() }) {
+            Column(modifier = Modifier
+                .padding(16.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Name") }
                 )
-                Row {
+                Row{
                     Text(text = "Quantity: $quantityText")
                     ScrollableNumberDropdown(
                         currentValue = selectedNumber,
@@ -341,9 +360,7 @@ fun AddItemPopup(
                             quantityText = newValue.toString()
                         })
                 }
-                Row {
-                    FlipButton(text = "Date button", onClick = { isFlipped = !isFlipped })
-                }
+                FlipButton(text = "Date button", onClick = { isFlipped = !isFlipped })
                 Row {
                     if (isFlipped) {
                         Text(text = "Expiry Date: $expiryDate")
@@ -355,6 +372,24 @@ fun AddItemPopup(
                             imageVector = Icons.Filled.DateRange,
                             contentDescription = "Choose a date"
                         )
+                    }
+                }
+                Row {
+                    Text(text = "Weeks to add:")
+                    Button(onClick = {
+                        expiryDate = addWeeksToDate(expiryDate, 1)
+                    }) {
+                        Text(text = "1")
+                    }
+                    Button(onClick = {
+                        expiryDate = addWeeksToDate(expiryDate, 2)
+                    }) {
+                        Text(text = "2")
+                    }
+                    Button(onClick = {
+                        expiryDate = addWeeksToDate(expiryDate, 3)
+                    }) {
+                        Text(text = "3")
                     }
                 }
                 if (showDatePickerDialog) {
@@ -418,9 +453,9 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = "Food Tracker",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(2f)
             )
-            IconButton(
+            /*IconButton(
                 onClick = {
                     try {
                         activity.getPictureResult.launch(null)
@@ -431,7 +466,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                 }
             ) {
                 Icon(imageVector = Icons.Filled.DateRange, contentDescription = "Expiry Date")
-            }
+            }*/
             IconButton(onClick = { showAddItemPopup = true }) {
                 Icon(imageVector = Icons.Filled.Add, contentDescription = "Plus")
             }
@@ -489,7 +524,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
 
         Column(modifier = Modifier.weight(1f)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
@@ -574,7 +609,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                 }
             }
         }
-
+/*
         Text(prodInfo)
         if (prodImgUrl.isNotBlank()) {
             AsyncImage(
@@ -582,7 +617,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                 contentDescription = "Image of product"/*, modifier = Modifier.fillMaxSize()*/
             )
         }
-        Text(ocrData)
+        Text(ocrData)*/
     }
 }
 
