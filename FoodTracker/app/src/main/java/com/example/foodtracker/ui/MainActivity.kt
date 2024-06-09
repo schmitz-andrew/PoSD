@@ -57,6 +57,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -94,7 +95,7 @@ class MainActivity : ComponentActivity() {
 
     val viewModel: MainViewModel by viewModels(factoryProducer = { MainViewModel.factory })
 
-    val getPictureResult =
+    /*val getPictureResult =
         registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
             run {
                 viewModel.parseDateFromImage(
@@ -103,7 +104,7 @@ class MainActivity : ComponentActivity() {
                     { err -> run { Log.e(TAG, err.toString()) } }
                 )
             }
-        }
+        }*/
 
     lateinit var scanner: GmsBarcodeScanner
 
@@ -262,9 +263,9 @@ fun FlipButton(
         contentAlignment = Alignment.Center
     ) {
         if (flipped) {
-            Text(text = "Expiry date", color = Color.White)
+            Text(text = "Expiry date", color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         } else {
-            Text(text = "Bought date", color = Color.Black)
+            Text(text = "Bought date", color = Color.Black, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
     }
 }
@@ -342,14 +343,16 @@ fun AddItemPopup(
     var selectedNumber by remember { mutableStateOf(1) }
     var isFlipped by remember { mutableStateOf((true)) }
     Dialog(onDismissRequest = { onDismissRequest() }) {
-        Box(Modifier.background(color = Color.White)) {
-            Column {
+        Box(Modifier.background(color = Color.White)
+            .clickable { onDismissRequest() }) {
+            Column(modifier = Modifier
+                .padding(16.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Name") }
                 )
-                Row {
+                Row{
                     Text(text = "Quantity: $quantityText")
                     ScrollableNumberDropdown(
                         currentValue = selectedNumber,
@@ -450,9 +453,9 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = "Food Tracker",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(2f)
             )
-            IconButton(
+            /*IconButton(
                 onClick = {
                     try {
                         activity.getPictureResult.launch(null)
@@ -463,7 +466,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                 }
             ) {
                 Icon(imageVector = Icons.Filled.DateRange, contentDescription = "Expiry Date")
-            }
+            }*/
             IconButton(onClick = { showAddItemPopup = true }) {
                 Icon(imageVector = Icons.Filled.Add, contentDescription = "Plus")
             }
@@ -521,7 +524,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
 
         Column(modifier = Modifier.weight(1f)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
@@ -606,7 +609,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                 }
             }
         }
-
+/*
         Text(prodInfo)
         if (prodImgUrl.isNotBlank()) {
             AsyncImage(
@@ -614,7 +617,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                 contentDescription = "Image of product"/*, modifier = Modifier.fillMaxSize()*/
             )
         }
-        Text(ocrData)
+        Text(ocrData)*/
     }
 }
 
