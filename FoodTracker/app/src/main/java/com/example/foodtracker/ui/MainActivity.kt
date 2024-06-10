@@ -52,7 +52,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -205,15 +204,23 @@ fun FlipButton(
             .clickable { flipped = !flipped; onClick() }
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .background(
-                color = if (flipped) Color.Blue else Color.LightGray,
+                color = if (flipped) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
                 shape = RoundedCornerShape(8.dp)
             ),
         contentAlignment = Alignment.Center
     ) {
         if (flipped) {
-            Text(text = "Expiry date", color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Text(
+                text = "Expiry date",
+                color = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         } else {
-            Text(text = "Bought date", color = Color.Black, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Text(
+                text = "Bought date",
+                color = MaterialTheme.colorScheme.onSecondary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         }
     }
 }
@@ -291,10 +298,11 @@ fun AddItemPopup(
     var selectedNumber by remember { mutableIntStateOf(1) }
     var isFlipped by remember { mutableStateOf((true)) }
     Dialog(onDismissRequest = { onDismissRequest() }) {
-        Box(Modifier.background(color = Color.White)
+        Box(Modifier.background(color = MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable { onDismissRequest() }) {
-            Column(modifier = Modifier
-                .padding(16.dp)) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
