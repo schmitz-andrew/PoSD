@@ -1,12 +1,10 @@
 package com.example.foodtracker.ui
 
-import android.content.ActivityNotFoundException
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
@@ -29,7 +27,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
@@ -42,7 +39,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -53,40 +49,23 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
-import coil.compose.AsyncImage
-import com.android.volley.Request
-import com.android.volley.RequestQueue
-import com.android.volley.Response
-import com.android.volley.toolbox.JsonObjectRequest
-import com.android.volley.toolbox.Volley
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.launch
-import org.json.JSONObject
-import java.lang.Integer.parseInt
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 
-
-var code: String? = null
 
 const val TAG = "TEST_CODE"
 
@@ -108,20 +87,11 @@ class MainActivity : ComponentActivity() {
 
     lateinit var scanner: GmsBarcodeScanner
 
-    lateinit var requestQueue: RequestQueue
-
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-//        lifecycleScope.launch {
-//            repeatOnLifecycle(Lifecycle.State.STARTED) {
-//                // TODO update ui elements?
-//            }
-//        }
-
         scanner = GmsBarcodeScanning.getClient(this)
-        requestQueue = Volley.newRequestQueue(this)
 
         setContent {
             FoodTrackerTheme {
@@ -137,29 +107,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-val txtProdInfo = mutableStateOf("No barcode scanned")
-val imgProdUrl = mutableStateOf("")
-
-
-fun showProductInfo(prodJson: JSONObject) {
-    val prodString = prodJson.toString(2)
-    //val prodCode = prodJson.get("code")
-    val prodObj = prodJson.getJSONObject("product")
-    val prodName = prodObj.get("product_name")
-    val prodImg = prodObj.get("image_small_url")
-
-    Log.i(TAG, prodString)
-    txtProdInfo.value = "$prodName"
-
-    if (prodImg.toString().isNotBlank()) {
-        imgProdUrl.value = prodImg.toString()
-    }
-}
-
-fun showError(e: Exception) {
-    Log.e(TAG, e.toString())
-    txtProdInfo.value = "ERROR: ${e.message}"
-}
 
 /***
  * This composable is the representation of a item in a list.
@@ -257,15 +204,23 @@ fun FlipButton(
             .clickable { flipped = !flipped; onClick() }
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .background(
-                color = if (flipped) Color.Blue else Color.LightGray,
+                color = if (flipped) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
                 shape = RoundedCornerShape(8.dp)
             ),
         contentAlignment = Alignment.Center
     ) {
         if (flipped) {
-            Text(text = "Expiry date", color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Text(
+                text = "Expiry date",
+                color = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         } else {
-            Text(text = "Bought date", color = Color.Black, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Text(
+                text = "Bought date",
+                color = MaterialTheme.colorScheme.onSecondary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         }
     }
 }
@@ -340,13 +295,14 @@ fun AddItemPopup(
     var name by remember { mutableStateOf(pName) }
     var quantityText by remember { mutableStateOf("0") }
     var showDatePickerDialog by remember { mutableStateOf(false) }
-    var selectedNumber by remember { mutableStateOf(1) }
+    var selectedNumber by remember { mutableIntStateOf(1) }
     var isFlipped by remember { mutableStateOf((true)) }
     Dialog(onDismissRequest = { onDismissRequest() }) {
-        Box(Modifier.background(color = Color.White)
+        Box(Modifier.background(color = MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable { onDismissRequest() }) {
-            Column(modifier = Modifier
-                .padding(16.dp)) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -443,8 +399,7 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
     val uiState by activity.viewModel.uiState.collectAsStateWithLifecycle(
         lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     )
-    val (prodInfo, prodImgUrl, ocrData, currentList) = uiState
-    var showAddItemPopup by rememberSaveable { mutableStateOf(false) }
+    val (prodInfo, prodImgUrl, ocrData, showAddItemPopup, currentList) = uiState
 
     val productsAtHome by activity.viewModel.getProductsAtHome().collectAsState(emptyList())
     val productsInCart by activity.viewModel.getProductsInCart().collectAsState(emptyList())
@@ -467,12 +422,12 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
             ) {
                 Icon(imageVector = Icons.Filled.DateRange, contentDescription = "Expiry Date")
             }*/
-            IconButton(onClick = { showAddItemPopup = true }) {
+            IconButton(onClick = activity.viewModel::showAddItemPopup) {
                 Icon(imageVector = Icons.Filled.Add, contentDescription = "Plus")
             }
             if (showAddItemPopup) {
                 AddItemPopup(
-                    onDismissRequest = { showAddItemPopup = false },
+                    onDismissRequest = { activity.viewModel.hideAddItemPopup() },
                     onConfirmationRequest = { name, quantity, expiryDate ->
                         coroutineScope.launch {
                             var quantityInt = quantity.toIntOrNull()
@@ -484,37 +439,18 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                                 quantityInt,
                                 expiryDate
                             )
-                            showAddItemPopup = false
+                            activity.viewModel.hideAddItemPopup()
                         }
                     },
-                    pName = txtProdInfo.value
+                    pName = prodInfo
                 )
             }
             IconButton(
                 onClick = {
                     activity.scanner.startScan()
-                        .addOnSuccessListener { barcode ->
-                            run {
-                                code = barcode.rawValue
-                                if (code == null) {
-                                    Log.e(TAG, "code is empty")
-                                } else {
-                                    txtProdInfo.value = "Waiting for product information..."
-                                    Log.i(TAG, code.orEmpty())
-                                    val dbUrl =
-                                        "https://world.openfoodfacts.org/api/v2/product/${code.orEmpty()}.json"
-                                    val request = JsonObjectRequest(
-                                        Request.Method.GET, dbUrl, null,
-                                        Response.Listener(::showProductInfo),
-                                        Response.ErrorListener(::showError)
-                                    )
-                                    activity.requestQueue.add(request)
-                                }
-                            }
-                        }
+                        .addOnSuccessListener(activity.viewModel::fetchFoodFacts)
                         .addOnCanceledListener { Log.e(TAG, "cancelled!") }
                         .addOnFailureListener { err -> Log.e(TAG, err.toString()) }
-                    showAddItemPopup = true
                 }
             ) {
                 //TODO: Replace Star with QR-Code

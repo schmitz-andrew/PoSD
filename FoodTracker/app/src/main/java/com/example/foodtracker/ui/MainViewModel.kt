@@ -8,9 +8,13 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.android.volley.Request
+import com.android.volley.Response
+import com.android.volley.toolbox.JsonObjectRequest
+import com.android.volley.toolbox.Volley
 import com.example.foodtracker.FoodTrackerApplication
 import com.example.foodtracker.data.Product
-import com.example.foodtracker.data.ProductDao
+import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -18,11 +22,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import org.json.JSONObject
 
 
 enum class LIST { Home, Cart }
@@ -31,8 +35,9 @@ data class MainUiState(
     val txtProdInfo: String = "no barcode scanned",
     val imgProdUrl: String = "",
     val txtOcrData: String  = "no ocr done",
+    val showItemPopup: Boolean = false,
 
-    var currentList: LIST = LIST.Home
+    val currentList: LIST = LIST.Home
 )
 
 data class ProductDetailsUiState(
@@ -44,9 +49,13 @@ data class ProductDetailsUiState(
 )
 
 
-class MainViewModel(private val productDao: ProductDao) : ViewModel() {
+class MainViewModel(private val application: FoodTrackerApplication) : ViewModel() {
 
-    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+    private val productDao = application.database.productDao()
+
+    private val requestQueue = Volley.newRequestQueue(application.applicationContext)
+
+    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.stateIn(
@@ -104,6 +113,10 @@ class MainViewModel(private val productDao: ProductDao) : ViewModel() {
         ) }
     }
 
+    fun showAddItemPopup() = _uiState.update { it.copy(showItemPopup = true) }
+
+    fun hideAddItemPopup() = _uiState.update { it.copy(showItemPopup = false) }
+
     fun parseDateFromImage(
         bitmap: Bitmap?, onCanceled: () -> Unit, onFailure: (Exception) -> Unit
     ) {
@@ -111,8 +124,8 @@ class MainViewModel(private val productDao: ProductDao) : ViewModel() {
         if (bitmap == null) {
             Log.e(TAG, "no bitmap returned")
         } else {
-            val isPortrait = bitmap.height > bitmap.width;
-            // TODO consider rotation, retry +180 if it dsnt work
+            val isPortrait = bitmap.height > bitmap.width
+            // TODO consider rotation, retry +180 if it doesn't work
             recognizer.process(bitmap, if (isPortrait) 0 else 90)
                 .addOnSuccessListener(::showOcrData)
                 .addOnCanceledListener(onCanceled)
@@ -121,13 +134,52 @@ class MainViewModel(private val productDao: ProductDao) : ViewModel() {
         // TODO find date string(s), maybe using regex
     }
 
-    // todo
+
+    private fun showProductInfo(prodJson: JSONObject) {
+        val prodString = prodJson.toString(2)
+        val prodObj = prodJson.getJSONObject("product")
+        val prodName = prodObj.get("product_name")
+        val prodImg = prodObj.get("image_small_url")
+
+        Log.i(TAG, prodString)
+        _uiState.update { currentState -> currentState.copy(
+            txtProdInfo = "$prodName",
+            imgProdUrl = prodImg.toString().ifBlank { "" },
+            showItemPopup = true
+        ) }
+    }
+
+    private fun showError(e: Exception) {
+        Log.e(TAG, e.toString())
+        _uiState.update { it.copy(txtProdInfo = "ERROR: ${e.message}") }
+    }
+
+    fun fetchFoodFacts(barcode: Barcode) {
+        val code = barcode.rawValue
+        if (code.isNullOrBlank()) {
+            Log.e(TAG, "code is empty")
+        }
+        else {
+            _uiState.update { currentState -> currentState.copy(
+                txtProdInfo = "Waiting for product information..."
+            ) }
+            Log.i(TAG, code)
+            val dbUrl = "https://world.openfoodfacts.org/api/v2/product/${code}.json"
+            val request = JsonObjectRequest(
+                Request.Method.GET, dbUrl, null,
+                Response.Listener(::showProductInfo),
+                Response.ErrorListener(::showError)
+            )
+            requestQueue.add(request)
+        }
+    }
+
 
     companion object {
         val factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val application = (this[APPLICATION_KEY] as FoodTrackerApplication)
-                MainViewModel(application.database.productDao())
+                MainViewModel(application)
             }
         }
     }
