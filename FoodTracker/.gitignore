@@ -12,6 +12,7 @@
 /.idea/androidTestResultsUserPreferences.xml
 /.idea/deploymentTarget*.xml
 /.idea/studiobot.xml
+/.idea/other.xml
 
 .DS_Store
 /build
