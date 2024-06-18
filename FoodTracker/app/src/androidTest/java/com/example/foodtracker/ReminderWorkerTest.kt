@@ -2,6 +2,8 @@ package com.example.foodtracker
 
 import android.app.NotificationManager
 import android.content.Context
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -27,11 +29,10 @@ class ReminderWorkerTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    @JvmField
-    @Rule
-    val runtimePermissionRule: GrantPermissionRule = GrantPermissionRule.grant(
-        android.Manifest.permission.POST_NOTIFICATIONS
-    )
+    @get:Rule
+    val runtimePermissionRule: GrantPermissionRule? = if (Build.VERSION.SDK_INT >= 33)
+        GrantPermissionRule.grant(android.Manifest.permission.POST_NOTIFICATIONS)
+    else GrantPermissionRule.grant()
 
     private val mockInputData = workDataOf(
         ReminderWorker.PRODUCT_NAME_KEY to "Apple",
