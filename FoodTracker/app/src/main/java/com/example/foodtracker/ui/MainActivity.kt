@@ -1,12 +1,10 @@
 package com.example.foodtracker.ui
 
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -87,7 +85,6 @@ class MainActivity : ComponentActivity() {
 
     lateinit var scanner: GmsBarcodeScanner
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -229,7 +226,6 @@ fun FlipButton(
 /***
  * This composable function represents the popup window to add/modify an item of a list.
  */
-@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddItemPopup(
@@ -390,7 +386,6 @@ fun AddItemPopup(
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
 
@@ -557,7 +552,6 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
 @Preview(showBackground = true)
 @Composable
 fun MainScreenPreview() {
