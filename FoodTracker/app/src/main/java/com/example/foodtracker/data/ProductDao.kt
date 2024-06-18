@@ -24,6 +24,9 @@ interface ProductDao {
     @Query("SELECT * FROM product WHERE in_cart = 1 ORDER BY name ASC")
     fun getProductsInCart(): Flow<List<Product>>
 
+    @Query("SELECT id FROM product WHERE rowid = :rowId")
+    fun getIdFromRowid(rowId: Long): Flow<Int>
+
     // TODO: how to deal with adding multiples? maybe at higher level i.e. do helper funs to update instead?
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(product: Product): Long
