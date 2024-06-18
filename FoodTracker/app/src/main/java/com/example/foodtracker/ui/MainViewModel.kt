@@ -1,6 +1,6 @@
 package com.example.foodtracker.ui
 
-import android.graphics.Bitmap
+// import android.graphics.Bitmap
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -13,15 +13,17 @@ import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.example.foodtracker.FoodTrackerApplication
+import com.example.foodtracker.data.ExpiryEta
 import com.example.foodtracker.data.Product
 import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.text.Text
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+// import com.google.mlkit.vision.text.Text
+// import com.google.mlkit.vision.text.TextRecognition
+// import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -49,13 +51,15 @@ data class ProductDetailsUiState(
 )
 
 
-class MainViewModel(private val application: FoodTrackerApplication) : ViewModel() {
+class MainViewModel(application: FoodTrackerApplication) : ViewModel() {
 
     private val productDao = application.database.productDao()
 
+    private val reminderRepository = application.reminderRepository
+
     private val requestQueue = Volley.newRequestQueue(application.applicationContext)
 
-    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    // private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.stateIn(
@@ -63,6 +67,28 @@ class MainViewModel(private val application: FoodTrackerApplication) : ViewModel
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = MainUiState()
     )
+
+    private suspend fun scheduleReminders(id: Int) {
+        reminderRepository.scheduleReminder(id, ExpiryEta.ONE_DAY)
+        reminderRepository.scheduleReminder(id, ExpiryEta.ONE_WEEK)
+    }
+
+    private fun cancelReminders(product: Product) {
+        if (!product.expiryDate.isNullOrBlank()) {
+            reminderRepository.cancelReminder(
+                product.id,
+                product.name,
+                product.expiryDate,
+                ExpiryEta.ONE_DAY
+            )
+            reminderRepository.cancelReminder(
+                product.id,
+                product.name,
+                product.expiryDate,
+                ExpiryEta.ONE_WEEK
+            )
+        }
+    }
 
     fun switchToCartList() {
         _uiState.update { it.copy(currentList = LIST.Cart) }
@@ -77,7 +103,10 @@ class MainViewModel(private val application: FoodTrackerApplication) : ViewModel
     }
 
     suspend fun insertProductAtHome(name: String, quantity: Int, expiryDate: String?) {
-        productDao.insert(Product(0, name, quantity, expiryDate, false))
+        val product = Product(0, name, quantity, expiryDate, false)
+        val rowid = productDao.insert(product)
+        val productId = productDao.getIdFromRowid(rowid).first()
+        scheduleReminders(productId)
     }
 
     fun getProductsInCart(): Flow<List<ProductDetailsUiState>> = productDao.getProductsInCart().map {
@@ -87,6 +116,7 @@ class MainViewModel(private val application: FoodTrackerApplication) : ViewModel
     suspend fun removeProduct(id: Int) {
         val product = productDao.getProductById(id).firstOrNull()
         if (product != null) {
+            cancelReminders(product)
             productDao.remove(product)
         }
     }
@@ -94,6 +124,7 @@ class MainViewModel(private val application: FoodTrackerApplication) : ViewModel
     suspend fun moveProductToCart(id: Int) {
         val product = productDao.getProductById(id).firstOrNull()
         if (product != null) {
+            cancelReminders(product)
             productDao.update(product.copy(inCart = true))
         }
     }
@@ -101,10 +132,12 @@ class MainViewModel(private val application: FoodTrackerApplication) : ViewModel
     suspend fun moveProductToHome(id: Int) {
         val product = productDao.getProductById(id).firstOrNull()
         if (product != null) {
+            scheduleReminders(product.id)
             productDao.update(product.copy(inCart = false))
         }
     }
 
+    /*
     private fun showOcrData(text: Text) {
         Log.d(TAG, text.text)
         //expDate = text.text
@@ -112,11 +145,13 @@ class MainViewModel(private val application: FoodTrackerApplication) : ViewModel
             txtOcrData = text.text
         ) }
     }
+     */
 
     fun showAddItemPopup() = _uiState.update { it.copy(showItemPopup = true) }
 
     fun hideAddItemPopup() = _uiState.update { it.copy(showItemPopup = false) }
 
+    /*
     fun parseDateFromImage(
         bitmap: Bitmap?, onCanceled: () -> Unit, onFailure: (Exception) -> Unit
     ) {
@@ -133,6 +168,7 @@ class MainViewModel(private val application: FoodTrackerApplication) : ViewModel
         }
         // TODO find date string(s), maybe using regex
     }
+     */
 
 
     private fun showProductInfo(prodJson: JSONObject) {

@@ -1,12 +1,10 @@
 package com.example.foodtracker.ui
 
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +47,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,7 +86,6 @@ class MainActivity : ComponentActivity() {
 
     lateinit var scanner: GmsBarcodeScanner
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -229,7 +227,6 @@ fun FlipButton(
 /***
  * This composable function represents the popup window to add/modify an item of a list.
  */
-@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddItemPopup(
@@ -282,24 +279,26 @@ fun AddItemPopup(
         return oneWeekLater.toString()
     }
 
+    fun millisToString(millis: Long?) = when (millis) {
+        is Long -> dateToString(convertMillisToLocalDate(millis))
+        else -> LocalDate.now().format(DateTimeFormatter.ISO_DATE).toString()
+    }
+
     //A val to keep track of the date
     val dateState = rememberDatePickerState()
-    val millisToLocalDate = dateState.selectedDateMillis?.let {
-        convertMillisToLocalDate(it)
+    var expiryDate by rememberSaveable {
+        mutableStateOf(millisToString(dateState.selectedDateMillis))
     }
-    var expiryDate by remember {
-        mutableStateOf(millisToLocalDate?.let {
-            dateToString(millisToLocalDate)
-        } ?: LocalDate.now().format(DateTimeFormatter.ISO_DATE).toString())
-    }
-    var name by remember { mutableStateOf(pName) }
-    var quantityText by remember { mutableStateOf("0") }
-    var showDatePickerDialog by remember { mutableStateOf(false) }
-    var selectedNumber by remember { mutableIntStateOf(1) }
-    var isFlipped by remember { mutableStateOf((true)) }
+    var name by rememberSaveable { mutableStateOf(pName) }
+    var quantityText by rememberSaveable { mutableStateOf("0") }
+    var showDatePickerDialog by rememberSaveable { mutableStateOf(false) }
+    var selectedNumber by rememberSaveable { mutableIntStateOf(1) }
+    var isFlipped by rememberSaveable { mutableStateOf((true)) }
     Dialog(onDismissRequest = { onDismissRequest() }) {
-        Box(Modifier.background(color = MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable { onDismissRequest() }) {
+        Box(
+            Modifier
+                .background(color = MaterialTheme.colorScheme.surfaceContainerHigh)
+                .clickable { onDismissRequest() }) {
             Column(
                 modifier = Modifier.padding(16.dp)
             ) {
@@ -353,7 +352,16 @@ fun AddItemPopup(
                         onDismissRequest = {
                             showDatePickerDialog = false
                         },
-                        confirmButton = {},
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    expiryDate = millisToString(dateState.selectedDateMillis)
+                                    showDatePickerDialog = false
+                                }
+                            ) {
+                                Text("Select")
+                            }
+                        },
                         dismissButton = {
                             TextButton(
                                 onClick = {
@@ -390,7 +398,6 @@ fun AddItemPopup(
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
 
@@ -460,7 +467,9 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
 
         Column(modifier = Modifier.weight(1f)) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
@@ -557,7 +566,6 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
 @Preview(showBackground = true)
 @Composable
 fun MainScreenPreview() {

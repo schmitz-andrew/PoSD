@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.foodtracker"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -75,6 +75,11 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
+
+    implementation(libs.androidx.work.runtime.ktx)
+
+    androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(libs.androidx.rules)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

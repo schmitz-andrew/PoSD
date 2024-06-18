@@ -40,8 +40,8 @@ class ProductDaoTest {
     private val product3 = Product(3, "Salad", 1, null, true)
     private val product4 = Product(4, "Sauce", 2, "2025-08-05")
 
-    private suspend fun addOneProductToDb() {
-        productDao.insert(product1)
+    private suspend fun addOneProductToDb(): Long {
+        return productDao.insert(product1)
     }
 
     private suspend fun addFourProductsToDb() {
@@ -129,6 +129,15 @@ class ProductDaoTest {
         assertEquals(product1, allProducts[1])
         assertEquals(product4, allProducts[2])
         assertEquals(product3.copy(inCart = !product3.inCart), allProducts[3])
+    }
+
+    @Test
+    fun productDaoGetIdFromRowid_ReturnsCorrectId() = runBlocking {
+        val rowId = addOneProductToDb()
+
+        val productId = productDao.getIdFromRowid(rowId).first()
+
+        assertEquals(1, productId)
     }
 
 }
