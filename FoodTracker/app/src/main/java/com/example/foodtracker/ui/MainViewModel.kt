@@ -1,6 +1,6 @@
 package com.example.foodtracker.ui
 
-import android.graphics.Bitmap
+// import android.graphics.Bitmap
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -15,9 +15,9 @@ import com.android.volley.toolbox.Volley
 import com.example.foodtracker.FoodTrackerApplication
 import com.example.foodtracker.data.Product
 import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.text.Text
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+// import com.google.mlkit.vision.text.Text
+// import com.google.mlkit.vision.text.TextRecognition
+// import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -55,7 +55,7 @@ class MainViewModel(private val application: FoodTrackerApplication) : ViewModel
 
     private val requestQueue = Volley.newRequestQueue(application.applicationContext)
 
-    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    // private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.stateIn(
@@ -105,6 +105,7 @@ class MainViewModel(private val application: FoodTrackerApplication) : ViewModel
         }
     }
 
+    /*
     private fun showOcrData(text: Text) {
         Log.d(TAG, text.text)
         //expDate = text.text
@@ -112,11 +113,13 @@ class MainViewModel(private val application: FoodTrackerApplication) : ViewModel
             txtOcrData = text.text
         ) }
     }
+     */
 
     fun showAddItemPopup() = _uiState.update { it.copy(showItemPopup = true) }
 
     fun hideAddItemPopup() = _uiState.update { it.copy(showItemPopup = false) }
 
+    /*
     fun parseDateFromImage(
         bitmap: Bitmap?, onCanceled: () -> Unit, onFailure: (Exception) -> Unit
     ) {
@@ -133,6 +136,7 @@ class MainViewModel(private val application: FoodTrackerApplication) : ViewModel
         }
         // TODO find date string(s), maybe using regex
     }
+     */
 
 
     private fun showProductInfo(prodJson: JSONObject) {
