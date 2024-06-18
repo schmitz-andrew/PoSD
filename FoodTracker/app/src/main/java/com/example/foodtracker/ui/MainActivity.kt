@@ -352,7 +352,16 @@ fun AddItemPopup(
                         onDismissRequest = {
                             showDatePickerDialog = false
                         },
-                        confirmButton = {},
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    expiryDate = millisToString(dateState.selectedDateMillis)
+                                    showDatePickerDialog = false
+                                }
+                            ) {
+                                Text("Select")
+                            }
+                        },
                         dismissButton = {
                             TextButton(
                                 onClick = {
