@@ -3,7 +3,6 @@ package com.example.foodtracker
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
