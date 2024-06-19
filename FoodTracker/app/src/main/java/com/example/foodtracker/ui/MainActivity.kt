@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -36,9 +35,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -327,6 +328,7 @@ fun AddItemPopup(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
 
@@ -390,37 +392,36 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
             }
         }
 
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+        PrimaryTabRow(
+            selectedTabIndex = currentList.ordinal
+        ) {
+            Tab(
+                selected = currentList == LIST.Home,
+                onClick = { activity.viewModel.switchToHomeList() },
+                modifier = Modifier.padding(vertical = 8.dp)
             ) {
-                Button(
-                    onClick = { activity.viewModel.switchToHomeList() },
-                    enabled = currentList != LIST.Home
-                ) {
-                    Text("At Home")
-                }
-                Button(
-                    onClick = { activity.viewModel.switchToCartList() },
-                    enabled = currentList != LIST.Cart
-                ) {
-                    Text("In Cart")
-                }
+                Text("At Home")
             }
-
+            Tab(
+                selected = currentList == LIST.Cart,
+                onClick = { activity.viewModel.switchToCartList() },
+                modifier = Modifier.padding(vertical = 8.dp)
+            ) {
+                Text("In Cart")
+            }
+        }
+        Column(modifier = Modifier.padding(all = 8.dp)) {
             when (currentList) {
                 LIST.Home -> LazyColumn(modifier = Modifier.weight(1f)) {
                     if (productsAtHome.isEmpty()) {
                         item(0) {
                             Text(
                                 text = "You don't have any food at home.",
-                                modifier = Modifier.fillMaxSize()
+                                style = MaterialTheme.typography.bodyLarge
                             )
                         }
-                    } else {
+                    }
+                    else {
                         items(productsAtHome.size, { productsAtHome[it].id }) { index ->
                             val product = productsAtHome[index]
                             ProductItem(
@@ -450,10 +451,11 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                         item(0) {
                             Text(
                                 text = "Your shopping list is empty.",
-                                modifier = Modifier.fillMaxSize()
+                                style = MaterialTheme.typography.bodyLarge
                             )
                         }
-                    } else {
+                    }
+                    else {
                         items(productsInCart.size, { productsInCart[it].id }) { index ->
                             val product = productsInCart[index]
                             ProductItem(
@@ -496,5 +498,19 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
 fun MainScreenPreview() {
     FoodTrackerTheme {
         MainScreen(MainActivity(), modifier = Modifier)
+    }
+}
+
+@Preview
+@Composable
+private fun ProductItemPreview() {
+    FoodTrackerTheme {
+        ProductItem(
+            product = ProductDetailsUiState(1, "Apple", 2, "2024-12-2"),
+            onAddToCart = {},
+            onMoveToHome = {}
+        ) {
+
+        }
     }
 }
