@@ -57,7 +57,7 @@ class MainActivityTest {
             .assertIsDisplayed().performClick()
 
         // ensure that no add item popup is open
-        composeTestRule.onNodeWithText(getAppName(composeTestRule.activity)).assertDoesNotExist()
+        composeTestRule.onNodeWithText(getAppName(composeTestRule.activity)).assertIsDisplayed()
     }
 
 }
