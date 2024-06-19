@@ -6,7 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,8 +34,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -49,7 +51,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -59,11 +60,6 @@ import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 
 
 const val TAG = "TEST_CODE"
@@ -157,17 +153,21 @@ fun ProductItem(
 
 
 /***
- * This composable is a dropdown menu which contains the numbers 1-100.
+ * This composable is a dropdown menu which contains the numbers 1-50.
  */
 @Composable
 fun ScrollableNumberDropdown(
+    label: String,
     currentValue: Int,
     onValueChanged: (Int) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    IconButton(onClick = { expanded = !expanded }) {
-        Icon(Icons.Filled.ArrowDropDown, contentDescription = "Select Quantity")
+    TextButton(onClick = { expanded = !expanded }) {
+        Row {
+            Text("$label: $currentValue")
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = "Select $label")
+        }
     }
 
     DropdownMenu(
@@ -175,50 +175,13 @@ fun ScrollableNumberDropdown(
         onDismissRequest = { expanded = false },
         modifier = Modifier.fillMaxHeight(0.5f)
     ) {
-        (1..100).forEach { number ->
+        (1..50).forEach { number ->
             DropdownMenuItem(onClick = {
                 expanded = false
                 onValueChanged(number)
             }, text = {
                 Text(text = number.toString())
             })
-        }
-    }
-}
-
-/***
- * This composable is a flip button which ether represents the expiry date or the bought date.
- */
-@Composable
-fun FlipButton(
-    text: String,
-    onClick: () -> Unit,
-    isFlipped: Boolean = true
-) {
-    var flipped by remember { mutableStateOf(isFlipped) }
-
-    Box(
-        modifier = Modifier
-            .clickable { flipped = !flipped; onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .background(
-                color = if (flipped) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                shape = RoundedCornerShape(8.dp)
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        if (flipped) {
-            Text(
-                text = "Expiry date",
-                color = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        } else {
-            Text(
-                text = "Bought date",
-                color = MaterialTheme.colorScheme.onSecondary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
         }
     }
 }
@@ -231,97 +194,59 @@ fun FlipButton(
 @Composable
 fun AddItemPopup(
     onDismissRequest: () -> Unit,
-    onConfirmationRequest: (String, String, String) -> Unit,
+    onConfirmationRequest: (String, Int, String) -> Unit,
     pName: String,
 ) {
-
-    //A function to convert milliseconds to local date.
-    fun convertMillisToLocalDate(millis: Long): LocalDate {
-        return Instant
-            .ofEpochMilli(millis)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-    }
-
-    //A function to convert milliseconds to local date with format.
-    fun convertMillisToLocalDateWithFormatter(
-        date: LocalDate,
-        dateTimeFormatter: DateTimeFormatter
-    ): LocalDate {
-        //Convert the date to a long in millis using a date formatter.
-        val dateInMillis = LocalDate.parse(date.format(dateTimeFormatter), dateTimeFormatter)
-            .atStartOfDay(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
-
-        //Convert the millis to a localDate object.
-        return Instant
-            .ofEpochMilli(dateInMillis)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-    }
-
-    //A function to convert a date to a string.
-    fun dateToString(date: LocalDate): String {
-        val dateFormatter = DateTimeFormatter.ISO_DATE
-        val dateInMillis = convertMillisToLocalDateWithFormatter(date, dateFormatter)
-        return dateFormatter.format(dateInMillis)
-    }
-
-    fun addWeeksToDate(expiryDate: String, number: Long): String {
-        val formatter = DateTimeFormatter.ISO_DATE
-        val localDate = try {
-            LocalDate.parse(expiryDate, formatter)
-        } catch (e: Exception) {
-            LocalDate.now()
-        }
-        val oneWeekLater = localDate.plus(number, ChronoUnit.WEEKS)
-        return oneWeekLater.toString()
-    }
-
-    fun millisToString(millis: Long?) = when (millis) {
-        is Long -> dateToString(convertMillisToLocalDate(millis))
-        else -> LocalDate.now().format(DateTimeFormatter.ISO_DATE).toString()
-    }
-
     //A val to keep track of the date
     val dateState = rememberDatePickerState()
     var expiryDate by rememberSaveable {
         mutableStateOf(millisToString(dateState.selectedDateMillis))
     }
     var name by rememberSaveable { mutableStateOf(pName) }
-    var quantityText by rememberSaveable { mutableStateOf("0") }
     var showDatePickerDialog by rememberSaveable { mutableStateOf(false) }
-    var selectedNumber by rememberSaveable { mutableIntStateOf(1) }
+    var quantity by rememberSaveable { mutableIntStateOf(1) }
     var isFlipped by rememberSaveable { mutableStateOf((true)) }
     Dialog(onDismissRequest = { onDismissRequest() }) {
         Box(
-            Modifier
-                .background(color = MaterialTheme.colorScheme.surfaceContainerHigh)
-                .clickable { onDismissRequest() }) {
+            Modifier.background(color = MaterialTheme.colorScheme.surfaceContainerHigh)
+        ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth()
             ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Name") }
                 )
-                Row{
-                    Text(text = "Quantity: $quantityText")
-                    ScrollableNumberDropdown(
-                        currentValue = selectedNumber,
-                        onValueChanged = { newValue ->
-                            quantityText = newValue.toString()
-                        })
-                }
-                FlipButton(text = "Date button", onClick = { isFlipped = !isFlipped })
-                Row {
-                    if (isFlipped) {
-                        Text(text = "Expiry Date: $expiryDate")
-                    } else {
-                        Text(text = "Bought Date $expiryDate")
+                ScrollableNumberDropdown(
+                    label = "Quantity",
+                    currentValue = quantity,
+                    onValueChanged = { newValue -> quantity = newValue }
+                )
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    SegmentedButton(
+                        selected = isFlipped,
+                        onClick = { isFlipped = true },
+                        shape = RoundedCornerShape(topStartPercent = 50, bottomStartPercent = 50)
+                    ) {
+                        Text("Expiry Date")
                     }
+                    SegmentedButton(
+                        selected = !isFlipped,
+                        onClick = { isFlipped = false },
+                        shape = RoundedCornerShape(bottomEndPercent = 50, topEndPercent = 50)
+                    ) {
+                        Text("Bought Date")
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = expiryDate)
                     IconButton(onClick = { showDatePickerDialog = true }) {
                         Icon(
                             imageVector = Icons.Filled.DateRange,
@@ -329,21 +254,25 @@ fun AddItemPopup(
                         )
                     }
                 }
-                Row {
-                    Text(text = "Weeks to add:")
-                    Button(onClick = {
-                        expiryDate = addWeeksToDate(expiryDate, 1)
-                    }) {
+                Text(text = "Add weeks:")
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedButton(
+                        onClick = { expiryDate = addWeeksToDate(expiryDate, 1) },
+                        modifier = Modifier.padding(end = 16.dp)
+                    ) {
                         Text(text = "1")
                     }
-                    Button(onClick = {
-                        expiryDate = addWeeksToDate(expiryDate, 2)
-                    }) {
+                    OutlinedButton(
+                        onClick = { expiryDate = addWeeksToDate(expiryDate, 2) },
+                        modifier = Modifier.padding(end = 16.dp)
+                    ) {
                         Text(text = "2")
                     }
-                    Button(onClick = {
-                        expiryDate = addWeeksToDate(expiryDate, 3)
-                    }) {
+                    OutlinedButton(
+                        onClick = { expiryDate = addWeeksToDate(expiryDate, 3) }
+                    ) {
                         Text(text = "3")
                     }
                 }
@@ -383,7 +312,7 @@ fun AddItemPopup(
                     TextButton(onClick = {
                         onConfirmationRequest(
                             name,
-                            quantityText,
+                            quantity,
                             expiryDate
                         )
                     }) {
@@ -437,13 +366,9 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
                     onDismissRequest = { activity.viewModel.hideAddItemPopup() },
                     onConfirmationRequest = { name, quantity, expiryDate ->
                         coroutineScope.launch {
-                            var quantityInt = quantity.toIntOrNull()
-                            if (quantityInt == null) {
-                                quantityInt = 0
-                            }
                             activity.viewModel.insertProductAtHome(
                                 name,
-                                quantityInt,
+                                quantity,
                                 expiryDate
                             )
                             activity.viewModel.hideAddItemPopup()
