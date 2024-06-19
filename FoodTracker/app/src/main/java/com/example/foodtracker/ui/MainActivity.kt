@@ -42,6 +42,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -53,17 +54,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.foodtracker.R
 import com.example.foodtracker.ui.theme.FoodTrackerTheme
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.launch
-
-
-const val TAG = "TEST_CODE"
 
 
 class MainActivity : ComponentActivity() {
@@ -81,8 +83,9 @@ class MainActivity : ComponentActivity() {
             }
         }*/
 
-    lateinit var scanner: GmsBarcodeScanner
+    private lateinit var scanner: GmsBarcodeScanner
 
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -93,7 +96,40 @@ class MainActivity : ComponentActivity() {
                 // A surface container using the 'background' color from the theme
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    containerColor = MaterialTheme.colorScheme.background
+                    containerColor = MaterialTheme.colorScheme.background,
+                    topBar = {
+                        TopAppBar(
+                            title = { Text(stringResource(id = R.string.app_name )) },
+                            actions = {
+                                /*IconButton(
+                                    onClick = {
+                                    try {
+                                        activity.getPictureResult.launch(null)
+                                    } catch (e: ActivityNotFoundException) {
+                                        // display error state to the user
+                                        Log.e(TAG, e.toString())
+                                    }
+                                }
+                                ) {
+                                    Icon(imageVector = Icons.Filled.DateRange, contentDescription = "Expiry Date")
+                                }*/
+                                IconButton(onClick = viewModel::showAddItemPopup) {
+                                    Icon(imageVector = Icons.Filled.Add, contentDescription = "Add a product")
+                                }
+                                IconButton(
+                                    onClick = {
+                                        scanner.startScan()
+                                            .addOnSuccessListener(viewModel::fetchFoodFacts)
+                                            .addOnCanceledListener { Log.e(TAG, "cancelled!") }
+                                            .addOnFailureListener { err -> Log.e(TAG, err.toString()) }
+                                    }
+                                ) {
+                                    //TODO: Replace Star with QR-Code
+                                    Icon(imageVector = Icons.Filled.AddCircle, contentDescription = "Scan barcode")
+                                }
+                            }
+                        )
+                    }
                 ) {
                     MainScreen(this, Modifier.padding(it))
                 }
@@ -216,6 +252,7 @@ fun AddItemPopup(
                     .padding(16.dp)
                     .fillMaxWidth()
             ) {
+                Text("Add a product", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -337,59 +374,27 @@ fun MainScreen(activity: MainActivity, modifier: Modifier = Modifier) {
     val uiState by activity.viewModel.uiState.collectAsStateWithLifecycle(
         lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     )
-    val (prodInfo, prodImgUrl, ocrData, showAddItemPopup, currentList) = uiState
+    val (prodInfo, _, _, showAddItemPopup, currentList) = uiState
 
     val productsAtHome by activity.viewModel.getProductsAtHome().collectAsState(emptyList())
     val productsInCart by activity.viewModel.getProductsInCart().collectAsState(emptyList())
 
     Column(modifier) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "Food Tracker",
-                modifier = Modifier.weight(2f)
-            )
-            /*IconButton(
-                onClick = {
-                    try {
-                        activity.getPictureResult.launch(null)
-                    } catch (e: ActivityNotFoundException) {
-                        // display error state to the user
-                        Log.e(TAG, e.toString())
+        if (showAddItemPopup) {
+            AddItemPopup(
+                onDismissRequest = { activity.viewModel.hideAddItemPopup() },
+                onConfirmationRequest = { name, quantity, expiryDate ->
+                    coroutineScope.launch {
+                        activity.viewModel.insertProductAtHome(
+                            name,
+                            quantity,
+                            expiryDate
+                        )
+                        activity.viewModel.hideAddItemPopup()
                     }
-                }
-            ) {
-                Icon(imageVector = Icons.Filled.DateRange, contentDescription = "Expiry Date")
-            }*/
-            IconButton(onClick = activity.viewModel::showAddItemPopup) {
-                Icon(imageVector = Icons.Filled.Add, contentDescription = "Plus")
-            }
-            if (showAddItemPopup) {
-                AddItemPopup(
-                    onDismissRequest = { activity.viewModel.hideAddItemPopup() },
-                    onConfirmationRequest = { name, quantity, expiryDate ->
-                        coroutineScope.launch {
-                            activity.viewModel.insertProductAtHome(
-                                name,
-                                quantity,
-                                expiryDate
-                            )
-                            activity.viewModel.hideAddItemPopup()
-                        }
-                    },
-                    pName = prodInfo
-                )
-            }
-            IconButton(
-                onClick = {
-                    activity.scanner.startScan()
-                        .addOnSuccessListener(activity.viewModel::fetchFoodFacts)
-                        .addOnCanceledListener { Log.e(TAG, "cancelled!") }
-                        .addOnFailureListener { err -> Log.e(TAG, err.toString()) }
-                }
-            ) {
-                //TODO: Replace Star with QR-Code
-                Icon(imageVector = Icons.Filled.AddCircle, contentDescription = "QR Code")
-            }
+                },
+                pName = prodInfo
+            )
         }
 
         PrimaryTabRow(
