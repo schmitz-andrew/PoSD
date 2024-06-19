@@ -31,6 +31,9 @@ import kotlinx.coroutines.flow.update
 import org.json.JSONObject
 
 
+const val TAG = "FT_UI"
+
+
 enum class LIST { Home, Cart }
 
 data class MainUiState(
@@ -175,12 +178,13 @@ class MainViewModel(application: FoodTrackerApplication) : ViewModel() {
         val prodString = prodJson.toString(2)
         val prodObj = prodJson.getJSONObject("product")
         val prodName = prodObj.get("product_name")
+        val code = prodJson.get("code")
         val prodImg = prodObj.get("image_small_url")
 
         Log.i(TAG, prodString)
         _uiState.update { currentState -> currentState.copy(
             txtProdInfo = "$prodName",
-            imgProdUrl = prodImg.toString().ifBlank { "" },
+            imgProdUrl = prodImg.toString().ifBlank { code.toString() },
             showItemPopup = true
         ) }
     }
